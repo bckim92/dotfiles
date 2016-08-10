@@ -29,3 +29,10 @@ fi
 
 # fzf
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# Android studio
+export ANDROID_HOME=$HOME/android-studio
+export PATH=$ANDROID_HOME/bin:$PATH
+
+# neovim
+alias vi='nvim'
