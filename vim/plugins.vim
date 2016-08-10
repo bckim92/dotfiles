@@ -62,6 +62,7 @@ if has('nvim')
 
     " in neovim, deoplete-jedi replaces jedi-vim
     Plug 'zchee/deoplete-jedi'
+    Plug 'zchee/deoplete-clang'
 endif
 
 call plug#end()
