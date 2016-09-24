@@ -63,13 +63,31 @@ post_actions = [
     # Run vim-plug installation
     'vim +PlugInstall +qall',
 
+    # Install tmux plugins via tpm
+    '~/.tmux/plugins/tpm/bin/install_plugins',
+
     # Change default shell if possible
     r'''# Change default shell to zsh
     if [[ ! "$SHELL" = *zsh ]]; then
         echo -e '\033[0;33mPlease type your password if you wish to change the default shell to ZSH\e[m'
         chsh -s /bin/zsh && echo -e 'Successfully changed the default shell, please re-login'
     fi
-    '''
+    ''',
+
+    # Create ~/.gitconfig.secret file and check user configuration
+    r'''# Create ~/.gitconfig.secret and user configuration
+    if [ ! -f ~/.gitconfig.secret ]; then
+        cat > ~/.gitconfig.secret <<EOL
+# vim: set ft=gitconfig:
+EOL
+    fi
+    if ! git config --file ~/.gitconfig.secret user.name 2>&1 > /dev/null; then echo -ne '
+    \033[1;33m[!] Please configure git user name and email:
+        git config --file ~/.gitconfig.secret user.name "(YOUR NAME)"
+        git config --file ~/.gitconfig.secret user.email "(YOUR EMAIL)"
+\033[0m'
+    fi
+    ''',
 ]
 
 ################# END OF FIXME #################
@@ -120,7 +138,15 @@ if submodule_missing:
     log(YELLOW("Do you want to update submodules? (y/n) "), cr=False)
     shall_we = (raw_input().lower() == 'y')
     if shall_we:
-        subprocess.call('git submodule update --init --recursive', shell=True)
+        git_submodule_update_cmd = 'git submodule update --init --recursive'
+        # git 2.8+ supports parallel submodule fetching
+        try:
+            git_version = str(subprocess.check_output("""git --version | awk '{print $3}'""", shell=True))
+            if git_version >= '2.8': git_submodule_update_cmd += ' --jobs 8'
+        except Exception as e:
+            pass
+        log("Running: %s" % BLUE(git_submodule_update_cmd))
+        subprocess.call(git_submodule_update_cmd, shell=True)
     else:
         log(RED("Aborted."))
         sys.exit(1)
