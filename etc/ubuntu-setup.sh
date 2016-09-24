@@ -43,12 +43,19 @@ install_neovim() {
     sudo /usr/bin/pip3 install neovim
 }
 
+install_clang() {
+    sudo apt-get update
+    sudo apt-get install -y clang
+}
+
 install_all() {
     # TODO dependency management: duplicated 'apt-get update'?
     install_essential_packages
     install_ppa_tmux
     install_ppa_git
     install_ppa_nginx
+    install_neovim
+    install_clang
 }
 
 
