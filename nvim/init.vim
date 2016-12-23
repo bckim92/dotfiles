@@ -7,10 +7,14 @@
 " e.g. /usr/bin/pip install neovim
 "  (or /usr/bin/pip3, /usr/local/bin/pip, depending environments)
 
-let g:python_host_prog  = '/usr/bin/python'
-if empty(glob("/usr/bin/python"))
-    " Fallback if not exists (e.g. Python3 in macOS)
+if has('mac')
     let g:python_host_prog = '/usr/local/bin/python'
+else
+    let g:python_host_prog = '/usr/bin/python'
+    if empty(glob("/usr/bin/python"))
+        " Fallback if not exists (e.g. Python3 in macOS)
+        let g:python_host_prog = '/usr/local/bin/python'
+    endif
 endif
 
 let g:python3_host_prog = '/usr/bin/python3'
