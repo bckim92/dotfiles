@@ -1,6 +1,8 @@
 # Custom Alias commands for ZSH
 
 # Basic
+alias c='command'
+
 alias cp='nocorrect cp -iv'
 alias mv='nocorrect mv -iv'
 alias rm='nocorrect rm -iv'
@@ -8,12 +10,14 @@ alias rm='nocorrect rm -iv'
 # Screen
 alias scr='screen -rD'
 
-# v: Neovim (if exists) or Vim
+# vim: Defaults to Neovim if exists
 if command -v nvim 2>&1 >/dev/null; then
-    alias v='nvim'
-else
-    alias v='vim'
+    alias vim='nvim'
 fi
+alias vi='vim'
+
+# Just open ~/.vimrc
+alias vimrc='vim +cd\ ~/.vim -O ~/.vim/vimrc ~/.vim/plugins.vim'
 
 # Tmux ========================================= {{{
 
@@ -26,6 +30,22 @@ alias tmuxa='tmux -2 attach-session -d -t'
 
 # I am lazy, yeah
 alias t='tmuxa'
+
+# tmuxp
+function tmuxp {
+    tmuxpfile="$1"
+    if [ -z "$tmuxpfile" ] && [[ -s ".tmuxp.yaml" ]]; then
+        tmuxpfile=".tmuxp.yaml"
+    fi
+
+    if [[ -s "$tmuxpfile" ]]; then
+        # (load) e.g. $ tmuxp [.tmuxp.yaml]
+        command tmuxp load $tmuxpfile
+    else
+        # (normal commands)
+        command tmuxp $@;
+    fi
+}
 
 # }}}
 
@@ -69,6 +89,9 @@ alias ipynb0='ipynb --ip=0.0.0.0'
 
 # pip install nose, rednose
 alias nt='NOSE_REDNOSE=1 nosetests -v'
+
+# green: in verbose mode
+alias green='green -vv'
 
 # }}}
 

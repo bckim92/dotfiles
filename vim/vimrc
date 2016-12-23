@@ -5,9 +5,9 @@
 
 scriptencoding utf-8
 
-"""""""""""""""""""""""""""
-" 0. Load Plugin
-"""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""
+" 0. Load Plugin {{{
+"""""""""""""""""""""""""""""""""""""""""
 
 " All the vim plugins, powered by 'vim-plug', are
 " listed up in the separate file 'plugins.vim'.
@@ -17,15 +17,21 @@ if filereadable(expand("\~/.vim/plugins.vim"))
     source \~/.vim/plugins.vim
 endif
 
-"""""""""""""""""""""""""""
-" 1. General Settings
-"""""""""""""""""""""""""""
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" 1. General Settings {{{
+"""""""""""""""""""""""""""""""""""""""""
 
 syntax on
 set nocompatible
 
+set shell=/bin/zsh
+
 " use path '~/.vim' even on non-unix machine
 set runtimepath+=~/.vim
+
+" add ~/.local/bin to $PATH
+let $PATH .= ":" . expand("\~/.local/bin")
 
 " load plugins with pathogen
 try
@@ -93,7 +99,9 @@ endif
 
 
 " encoding and line ending settings
-set encoding=utf-8
+if !has('nvim')
+    set encoding=utf-8
+endif
 set fileencodings=utf-8,cp949,latin1
 set fileformats=unix,dos
 
@@ -117,7 +125,7 @@ set lazyredraw              " no redrawing during macro execution
 
 set mps+=<:>
 
-" when launching files via quickfix, CtrlP, or something else,
+" when launching files via quickfix, FZF, or something else,
 " first switch to existing tab (if any) that contains the target buffer,
 " or open a new buffer by splitting window in the current tab otherwise.
 set switchbuf+=usetab,split
@@ -133,19 +141,21 @@ endif
 
 " use strong encryption
 if ! has('nvim')
-    if v:version == 704 && has('patch399')
+    if v:version >= 800 || v:version == 704 && has('patch399')
         set cryptmethod=blowfish2 " Requires >= 7.4.399
     else
         set cryptmethod=blowfish
     endif
 endif
 
-""""""""""""""""""""""""""""""""
-" 2. Key and Functional Mappings
-""""""""""""""""""""""""""""""""
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" 2. Key and Functional Mappings {{{
+"""""""""""""""""""""""""""""""""""""""""
 
 " the leader key
 let mapleader=","           " comma is the <Leader> key.
+let maplocalleader=","      " comma : <LocalLeader>
 
 " navigation key mapping
 map k gk
@@ -158,6 +168,9 @@ nmap <down> gj
 
 inoremap <up> <c-\><c-o>gk
 inoremap <down> <c-\><c-o>gj
+
+noremap <C-F> <C-D>
+noremap <C-B> <C-U>
 
 " Ignore errornous input in Mac OS X
 imap <D-space> <Nop>
@@ -172,7 +185,43 @@ noremap <C-j> <C-w>j
 noremap <C-k> <C-w>k
 noremap <C-l> <C-w>l
 
+nnoremap <tab> <c-w>w
+nnoremap <S-tab> <c-w>W
+
+
+" in terminal mode (neovim)
+if has('nvim')
+    " <C-\><C-n> is the key sequence for escaping form terminal mode
+    " <c-[> and double <C-\> also goes for escaping from terminal
+    tnoremap <C-[> <C-\><C-n>
+    tnoremap <C-\><C-\> <C-\><C-n>
+
+    " Automatically enter insert mode when entering neovim terminal buffer
+    autocmd BufWinEnter,WinEnter term://* startinsert
+
+    " Mapping for <c-hjkl> in terminal mode
+    " <c-h> might not work: see https://github.com/neovim/neovim/issues/2048
+    tmap <C-h> <C-\><C-n><C-h>
+    tmap <C-j> <C-\><C-n><C-j>
+    tmap <C-k> <C-\><C-n><C-k>
+    "tmap <C-l> <C-\><C-n><C-l>
+    " TODO: <c-l> is for clear screen...?
+endif
+
+if has('nvim')
+    " workaround for <c-h> mapping bug in neovim
+    " @see https://github.com/neovim/neovim/issues/2048
+    nmap <BS> <C-W>h
+endif
+
+" Buffer navigations
+nnoremap [b  :bprevious<CR>
+nnoremap ]b  :bnext<CR>
+
 " Tab navigations
+nnoremap [t  :tabprevious<CR>
+nnoremap ]t  :tabnext<CR>
+
 nnoremap <C-t>     :tabnew<CR>
 nnoremap <C-S-tab> :tabprevious<CR>
 nnoremap <C-tab>   :tabnext<CR>
@@ -199,17 +248,34 @@ nnoremap 9 9gt
 vnoremap < <gv
 vnoremap > >gv
 
+" Locations
+nnoremap [l :lprevious<CR>
+nnoremap ]l :lnext<CR>
 
-" [F5] Make and Build
+" -----------------------
+" [F5] Make and Build {{{
+" -----------------------
+" use Make (vim-dispatch) or Neomake (neomake)
+if has_key(g:plugs, 'neomake')
+    " neomake; always use the bang version so that :copen can sync
+    command! -nargs=0 -bang TheMake Neomake!
+    command! -nargs=0 TheCopen copen
+else
+    " vim-dispatch
+    command! -nargs=0 -bang TheMake Make<bang>
+    command! -nargs=0 TheCopen Copen
+endif
+
+
 " smartly dispatch according to filetype
 function! s:run_make(bang)
     let l:silent_filetypes = ['tex', 'pandoc', 'lilypond']
     " (1) bang given, force background
-    if a:bang == "!" | Make!
+    if a:bang == "!" | TheMake!
     " (2) for specified filetypes, use background
-    elseif index(l:silent_filetypes, &filetype) >= 0 | Make!
+    elseif index(l:silent_filetypes, &filetype) >= 0 | TheMake!
     " (3) otherwise, make with foreground shown
-    else | Make
+    else | TheMake
     end
 endfunction
 command! -nargs=0 -bang RunMake call s:run_make("<bang>")
@@ -217,7 +283,7 @@ command! -nargs=0 -bang RunMake call s:run_make("<bang>")
 " A handy way to set makeprg.
 command! -nargs=1 Makeprg let &g:makeprg="<args>" | echo "makeprg = <args>"
 
-if isdirectory(expand("~/.vim/plugged/vim-dispatch"))
+if has_key(g:plugs, 'vim-dispatch')
     " use vim-dispatch if exists
 
     " <F5>: run make, asynchronously or split windows (dispatch)
@@ -228,13 +294,16 @@ if isdirectory(expand("~/.vim/plugged/vim-dispatch"))
     map  <leader><F5> <ESC>:w<CR>:RunMake!<CR>
 
     " <F6>: show quickfix window (scroll bottom)
-    map  <F6> :Copen<CR>G
-    imap <F6> <ESC>:Copen<CR>G:wincmd w<CR>a
+    map  <F6> :TheCopen<CR>G
+    imap <F6> <ESC>:TheCopen<CR>G:wincmd w<CR>a
 else
     " otherwise, fallback to default make
     map <F5> <ESC>:w<CR>:make!<CR>
     imap <F5> <ESC>:w<CR>:make!<CR>a
 endif
+
+" }}}
+
 
 " [F4] Next Error [Shift+F4] Previous Error
 map <F4> <ESC>:cn<CR>
@@ -261,6 +330,8 @@ nmap <leader><space> :noh<CR>
 " Plugin ag.vim
 " <leader>ag : Ag (search file contents)
 nnoremap <leader>ag :Ag! -i ""<Left>
+xnoremap <silent> <leader>ag y:Ag <C-R>"<CR>
+
 
 " <leader>cd : switch to the directory of the current buffer
 nmap <leader>cd :cd %:p:h<CR>
@@ -272,7 +343,7 @@ nnoremap <leader>r :redraw!<CR>
 nnoremap <leader>src :source ~/.vimrc<CR>
 
 " <leader>{y,x,p} : {yank,cut,paste} wrt the system clipboard
-noremap <leader>y "*y
+map <leader>y "*y
 noremap <leader>x "*x
 noremap <leader>p "*p
 
@@ -304,13 +375,43 @@ map  <leader>s{ ysiw{
 map  <leader>s} ysiw}
 
 " Zoom Tmux
-map <leader>z :silent exec "!tmux resize-pane -Z"<CR>
+noremap <silent> <leader>z :silent exec "!tmux resize-pane -Z"<CR>
+
+" Prevent accidental <Ctrl-A> on Tmux
+if $TERM =~ 'screen'
+    nnoremap <C-a> <nop>
+    " To increase numbers, press <comma>, <c-a>, a ...?
+    nnoremap <leader><C-a> <C-a>
+endif
 
 " }}}
 
-"""""""""""""""""""""""""""""""""
-" 3. Colors, Highlight and Syntax
-"""""""""""""""""""""""""""""""""
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" 3. More Functions and Commands {{{
+"""""""""""""""""""""""""""""""""""""""""
+
+" ----------------------------------------------------------------------------
+" <Leader>?/! : Google it / Feeling lucky
+"   (code brought from @junegunn/dotfiles)
+" ----------------------------------------------------------------------------
+function! s:goog(pat, lucky)
+  let q = '"'.substitute(a:pat, '["\n]', ' ', 'g').'"'
+  let q = substitute(q, '[[:punct:] ]',
+       \ '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
+  call system(printf('open "https://www.google.com/search?%sq=%s"',
+                   \ a:lucky ? 'btnI&' : '', q))
+endfunction
+
+nnoremap <leader>? :call <SID>goog(expand("<cword>"), 0)<cr>
+nnoremap <leader>! :call <SID>goog(expand("<cword>"), 1)<cr>
+xnoremap <leader>? "gy:call <SID>goog(@g, 0)<cr>gv
+xnoremap <leader>! "gy:call <SID>goog(@g, 1)<cr>gv
+
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" 4. Appearance (e.g. Colors, Syntax) {{{
+"""""""""""""""""""""""""""""""""""""""""
 
 " color settings
 " @see http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
@@ -354,6 +455,7 @@ filetype indent on
 
 " filetype detections
 au BufRead,BufNewFile /etc/nginx/* if &ft == '' | setfiletype nginx | endif
+au BufRead,BufNewFile *.prototxt if &ft == '' | setfiletype yaml | endif
 
 autocmd FileType git setlocal foldlevel=1
 
@@ -378,6 +480,8 @@ autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
 autocmd InsertLeave * match ExtraWhitespace /\s\+$/
 autocmd BufWinLeave * call clearmatches()
 
+" Unset paste when leaving insert mode
+autocmd InsertLeave * silent! set nopaste
 
 " better popup menu colors (instead of dark black)
 highlight Pmenu ctermfg=black ctermbg=yellow
@@ -390,9 +494,12 @@ function! ShowSyntaxGroup()
         \ . synIDattr(synIDtrans(synID(line("."),col("."),1)),"name") . ">"
 endfunction
 
-"""""""""""""""""""""""""""
-" 4. GUI Options
-"""""""""""""""""""""""""""
+noremap <leader>syn :call ShowSyntaxGroup()<cr>
+
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" 5. GUI Options {{{
+"""""""""""""""""""""""""""""""""""""""""
 
 " gui settings
 if has("gui_running")
@@ -424,16 +531,18 @@ if has("gui_running")
 endif
 
 
-"""""""""""""""""""""""""""
-" 5. Plugin Settings
-"""""""""""""""""""""""""""
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" 6. Plugin Settings {{{
+"""""""""""""""""""""""""""""""""""""""""
 
+" ----------------------------------------------------------------
 " vim-polyglot {{{
 
-let g:polyglot_disabled = ['python']
+" in favor of python-mode and vimtex ...
+let g:polyglot_disabled = ['python', 'latex']
 
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " vim-startify {{{
 
 let g:startify_bookmarks = [
@@ -447,57 +556,131 @@ let g:startify_skiplist = [
     \ 'plugged/.*/doc',
     \ 'bundle/.*/doc',
     \ ]
-" }}}
+" ---------------------------------------------------------------- }}}
+" vim-emoji {{{
 
+" replace emoji in selected lines
+" (snippet brought from @junegunn/dotfiles)
+function! s:replace_emojis() range
+    for lnum in range(a:firstline, a:lastline)
+        let line = getline(lnum)
+        let subs = substitute(line,
+                    \ ':\([^:]\+\):', '\=emoji#for(submatch(1), submatch(0))', 'g')
+        if line != subs
+            call setline(lnum, subs)
+        endif
+    endfor
+    redraw!
+endfunction
+
+command! -range EmojiReplace <line1>,<line2>call s:replace_emojis()
+xnoremap <leader>emoji :Emoji<CR>
+
+
+" ---------------------------------------------------------------- }}}
+" vim-highlightedyank {{{
+if ! has("nvim")
+    map y <Plug>(highlightedyank)
+endif
+
+"hi HighlightedyankRegion cterm=reverse gui=reverse
+let g:highlightedyank_highlight_duration = 1000
+
+" ---------------------------------------------------------------- }}}
 " Airline {{{
-    " use airline, with powerline-ish theme
-    let g:airline_theme='bubblegum'
-    let g:airline_powerline_fonts=1
 
-    " enable tabline feature
-    let g:airline#extensions#tabline#enabled = 1
+" use airline, with powerline-ish theme
+let g:airline_theme='bubblegum'
+let g:airline_powerline_fonts=1
 
-    " do not display buffers in the tabline if there is only one tab
-    let g:airline#extensions#tabline#show_buffers = 0
+" enable tabline feature
+let g:airline#extensions#tabline#enabled = 1
 
-    " suppress mixed-indent warning for javadoc-like comments (/** */)
-    let g:airline#extensions#whitespace#mixed_indent_algo = 1
-" }}}
+" do not display buffers in the tabline if there is only one tab
+let g:airline#extensions#tabline#show_buffers = 0
 
+" suppress mixed-indent warning for javadoc-like comments (/** */)
+let g:airline#extensions#whitespace#mixed_indent_algo = 1
+
+" ---------------------------------------------------------------- }}}
+" Neomake {{{
+
+" so that ':Neomake clean' invokes 'make clean'
+let g:neomake_clean_maker = { 'exe': 'make', 'args': ['clean'] }
+
+" ---------------------------------------------------------------- }}}
 " FZF {{{
 
 " Inside vim, set environment variable FZF_DEFAULT_COMMAND
 " so that it can list the files by 'git ls-files' or 'ag'.
 if executable("ag")
-    let $FZF_DEFAULT_COMMAND = '(git ls-files ":/" || ag -l -g "") | LC_COLLATE=C sort | uniq  2> /dev/null'
+    "let $FZF_DEFAULT_COMMAND = '(git ls-files ":/" || ag -l -g "") | LC_COLLATE=C sort | uniq  2> /dev/null'
+    let $FZF_DEFAULT_COMMAND = 'ag -l -g "" 2> /dev/null'
 endif
 
-" :F is a shortcut for :FZF
-command! F FZF
+" :F is a shortcut for :GFiles or :FZF
+function! s:fzf_smart()
+    let l:git_dir = fugitive#extract_git_dir(expand('%:p'))
+    " in a git repo, invoke :GFiles
+    if ! empty(l:git_dir) | GFiles
+    " not in git repo, invoke :FZF by fallback
+    else | FZF
+    endif
+endfunction
+command! -nargs=0 F call s:fzf_smart()
 
-" Invoke FZF Using Ctrl-P
-nmap <C-P> :FZF<CR>
+" Invoke F (FZF) Using Ctrl-P
+nmap <C-P> :F<CR>
 
+
+" custom commands using fzf
+
+" :Z -- cd to recent working directories using fasd
+command! -nargs=* Z call fzf#run
+            \({
+            \ 'source':  printf('fasd -Rdl "%s"',
+            \                   escape(empty(<q-args>) ? '' : <q-args>, '"\')),
+            \ 'options': '-1 -0 --no-sort +m',
+            \ 'down':    '~33%',
+            \ 'sink':    'NERDTree'
+            \})
+
+" :Plugs -- list all vim plugins and open the directory of the selected
+command! -nargs=* Plugs call fzf#run
+            \({
+            \ 'source':  map(sort(keys(g:plugs)), 'g:plug_home . "/" . v:val'),
+            \ 'options': '--delimiter "/" --nth -1' . printf(' --query "%s"', <q-args>),
+            \ 'down':    '~33%',
+            \ 'sink':    'NERDTree'
+            \})
 
 " Leader key mappings for vim-fzf commands
 
 " List all open buffers
 nnoremap <leader>FB :Buffers<CR>
+nnoremap <leader>B :Buffers<CR>
+" :B goes to :Buffers
+command! B Buffers
 " Tags in the current buffer (see tagbar)
 nnoremap <leader>FT :BTags<CR>
 " Git commits
 nnoremap <leader>FG :Commits<CR>
+" History (recently opened files)
+nnoremap <leader>FH :History<CR>
+nnoremap <leader>H :History<CR>
+" :H goes to :History
+command! H History
 
-" }}}
+" ---------------------------------------------------------------- }}}
+" Dash {{{
 
-" CtrlP.vim (deprecated) {{{
-let g:ctrlp_custom_ignore = '\v[\/](node_modules|target|dist|bin)|(\.(ico|git|svn))$'
+" ----------------------------------------------------------------------------
+" <Leader>/ : Launch Dash on the words on cursor or in block
+" ----------------------------------------------------------------------------
+nnoremap <leader>/ :Dash <cword><cr>
+xnoremap <leader>/ "gy:Dash <c-r>g<cr>gv
 
-" Default to filename searches (switch: C-D)
-let g:ctrlp_by_filename = 1
-
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " SuperTab {{{
 
 " Use 'omnicomplete' as the default completion type.
@@ -508,8 +691,7 @@ let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
 " no tab completion at the start of line or after whitespace.
 let g:SuperTabNoCompleteAfter = ['^', '\s']
 
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " NerdTree {{{
 
 " change CWD when the NERDtree is first loaded to the directory initialized in
@@ -526,16 +708,14 @@ let g:nerdtree_tabs_open_on_gui_startup = 0
 " filter out some files, by extension
 let NERDTreeIgnore = ['\.pyc$', '\.class$', '\.o$']
 
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " Voom {{{
 
 let g:voom_ft_modes = {'pandoc': 'markdown', 'tex': 'latex'}
 
 nnoremap <leader>V :VoomToggle<CR>
 
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " Easymotion {{{
 
 " Trigger <,f> to launch easymotion global jump
@@ -549,8 +729,7 @@ nmap <leader>f <Plug>(easymotion-s)
 let g:EasyMotion_enter_jump_first = 1
 let g:EasyMotion_space_jump_first = 1
 
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " vim-easy-align {{{
 
 " Start interactive EasyAlign in visual mode (e.g. vipga)
@@ -558,14 +737,13 @@ xmap ga <Plug>(EasyAlign)
 " Start interactive EasyAlign for a motion/text object (e.g. gaip)
 nmap ga <Plug>(EasyAlign)
 
-" }}}
-
-" UltiSnips {{
+" ---------------------------------------------------------------- }}}
+" UltiSnips {{{
 let g:UltiSnipsExpandTrigger="<c-j>"
 let g:UltiSnipsJumpForwardTrigger="<c-j>"
 let g:UltiSnipsJumpBackwardTrigger="<c-k>"
-" }}}
 
+" ---------------------------------------------------------------- }}}
 " vim-pandoc {{{
 
 " disable automatic folding
@@ -577,13 +755,16 @@ let g:pandoc#syntax#conceal#use = 0
 " disable spell check
 let g:pandoc#spell#enabled = 0
 
-" }}}
-
+" ---------------------------------------------------------------- }}}
 " vim-javacomplete2 {{{
 autocmd FileType java setlocal omnifunc=javacomplete#Complete
-" }}}
 
-" python {{{
+" ---------------------------------------------------------------- }}}
+" deoplete.nvim {{{
+let g:deoplete#enable_at_startup = 1
+
+" ---------------------------------------------------------------- }}}
+" python (pymode, jedi) {{{
 
 " heavenshell/vim-pydocstring
 " Change default keymapping to <C-_> (default is <C-l>)
@@ -639,16 +820,50 @@ let g:jedi#smart_auto_mappings = 0
 " @see https://github.com/davidhalter/jedi-vim/issues/257
 let g:jedi#show_call_signatures = 0
 
-" make jedi-vim open a new tab instead of switching the current buffer,
+" make jedi-vim open a splitted window in the current tab
+" instead of opening a new tab (which can be done manually via :wincmd T),
 " when goto (e.g. goto definition) is performed
-let g:jedi#use_tabs_not_buffers = 1
+let g:jedi#use_tabs_not_buffers = 0
+let g:jedi#use_splits_not_buffers = 'bottom'
 
-" }}}
+" ---------------------------------------------------------------- }}}
+" deoplete-clang {{{
 
+if filereadable('/usr/lib/llvm-3.4/lib/libclang.so')
+    let g:deoplete#sources#clang#libclang_path = '/usr/lib/llvm-3.4/lib/libclang.so'
+elseif filereadable('/usr/lib/llvm-3.4/lib/libclang.so.1')
+    let g:deoplete#sources#clang#libclang_path = '/usr/lib/llvm-3.4/lib/libclang.so.1'
+elseif filereadable('/Library/Developer/CommandLineTools/usr/lib/libclang.dylib')
+    let g:deoplete#sources#clang#libclang_path = '/Library/Developer/CommandLineTools/usr/lib/libclang.dylib'
+endif
+
+
+if isdirectory('/usr/include/clang')
+    let g:deoplete#sources#clang#clang_header = '/usr/include/clang/'
+elseif isdirectory('/Library/Developer/CommandLineTools/usr/lib/clang/')
+    let g:deoplete#sources#clang#clang_header = '/Library/Developer/CommandLineTools/usr/lib/clang/'
+endif
+
+" ---------------------------------------------------------------- }}}
 " LaTeX {{{
-let g:LatexBox_Folding = 1
-" }}}
 
+let g:LatexBox_Folding = 1
+
+let g:vimtex_mappings_enabled = 1
+
+" Disable callback feature if vim lacks feature +clientserver
+if ! (has('clientserver') || has('nvim'))
+    let g:vimtex_latexmk_callback = 0
+endif
+
+" in macOS, use Skim as the default LaTeX PDF viewer (for vimtex)
+" for :Vimtexview, move Skim's position to where the cursor currently points to.
+if has('mac')
+    let g:vimtex_view_general_viewer = '/Applications/Skim.app/Contents/SharedSupport/displayline'
+    let g:vimtex_view_general_options = '-r -g @line @pdf @tex'
+endif
+
+" ---------------------------------------------------------------- }}}
 " fugitive {{{
 
 " key mappings
@@ -659,30 +874,33 @@ nnoremap <leader>gw :Gwrite<CR>
 nnoremap <leader>gb :Gblame -w<CR>:vertical resize 10<CR>
 nnoremap <leader>gci :Gcommit --verbose<CR>
 
-" }}}
+" on commit, type 'cA' to enter in amend mode
+au FileType gitcommit nnoremap <buffer> <silent>
+            \ cA :bd<CR>:<C-U>Gcommit --verbose --amend<CR>
 
-" gundo key mappings and options
+
+" ---------------------------------------------------------------- }}}
+" gundo key mappings and options {{{
 let g:gundo_right = 1   " show at right
 nnoremap <leader>G :GundoToggle<CR>
 
-" tagbar key mappings
+" ---------------------------------------------------------------- }}}
+" tagbar key mappings {{{
 nnoremap <leader>T :TagbarToggle<CR>
 
-" deoplete.nvim {{{
-let g:deoplete#enable_at_startup = 1
-if filereadable("/usr/lib/llvm-3.4/lib/libclang.so")
-    let g:deoplete#sources#clang#libclang_path = "/usr/lib/llvm-3.4/lib/libclang.so"
-else
-    let g:deoplete#sources#clang#libclang_path = "/usr/lib/llvm-3.4/lib/libclang.so.1"
-endif
-let g:deoplete#sources#clang#clang_header = "/usr/lib/llvm-3.4/lib/clang"
-" }}}
+" ---------------------------------------------------------------- }}}
 
-"""""""""""""""""""""""""""
-" Extra Settings
-"""""""""""""""""""""""""""
+" }}}
+"""""""""""""""""""""""""""""""""""""""""
+" Extra Settings {{{
+"""""""""""""""""""""""""""""""""""""""""
 
 " Use local vimrc if available
 if filereadable(expand("\~/.vimrc.local"))
     source \~/.vimrc.local
 endif
+
+" }}}
+
+" 'zo' for open a fold, or 'zR' for all folds
+" vim: set foldmethod=marker foldlevel=0:

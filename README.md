@@ -1,9 +1,10 @@
 Dotfiles
 ========
 
-Personal dotfiles for \*NIX (Mac OS X and Linux) systems.
+🏠 Personal dotfiles for \*NIX (Mac OS X and Linux) systems.
 
-## Installation
+Installation
+------------
 
 ### Clone and Install!
 
@@ -12,12 +13,11 @@ git clone --recursive -j8 https://github.com/bckim92/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles && python install.py
 ```
 
-Note: The `-j8` (`--jobs 8`) option works with Git >= 2.8 (for parallel submodule fetching).
+Note: The `-j8` (`--jobs 8`) option works with Git >= 2.8 (parallel submodule fetching).
 For older versions of Git, try without `-j` option.
 
 The installation script will create symbolic links for the specified dotfiles.
 If some target file already exists (e.g. `~/.vim`), you will need to manually resolve the conflict (delete the old one or just ignore).
-
 
 ### install.py script
 
@@ -25,8 +25,19 @@ This is a clunky installation script written in python;
 the task definition lies on the top of the script file.
 
 
-## Tips for Beginners
+Some Handy URLs
+---------------
+
+Every file is accessible through `dotfiles.wook.kr` (via `curl -L` or `wget`), e.g.
+
+* https://dotfiles.wook.kr/vimrc
+* https://dotfiles.wook.kr/vimrc?raw=true
+* https://dotfiles.wook.kr/bin/tb
+
+
+Troubleshooting
+---------------
 
 * Powerline characters not displayed properly? Install [Powerline fonts](https://github.com/powerline/fonts).
 * Ruby version is shown unwantedly? A simple workaround might be to install [rvm](https://rvm.io/).
-* Does `tmux` look weird? Make sure that tmux version is 1.9a or higher.
+* Does `tmux` look weird? Make sure that tmux version is [2.3](etc/ubuntu-setup.sh) or higher.

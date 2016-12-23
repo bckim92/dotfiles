@@ -1,5 +1,9 @@
 let s:darwin = has('mac')
 
+" Plug buffers appear in a new tab
+let g:plug_window = '-tabnew'
+
+
 call plug#begin('~/.vim/plugged')
 
 " General and Behaviour
@@ -16,7 +20,12 @@ Plug 'jistr/vim-nerdtree-tabs'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 Plug 'vim-voom/VOoM', { 'on' : ['Voom', 'VoomToggle'] }
 Plug 'tpope/vim-dispatch', { 'tag' : 'v1.1' }
+if has('nvim') || v:version >= 800
+    Plug 'neomake/neomake'
+endif
+Plug 'tpope/vim-tbone'
 Plug 'christoomey/vim-tmux-navigator'
+Plug 'tmux-plugins/vim-tmux-focus-events'
 Plug 'tpope/vim-fugitive'
 Plug 'junegunn/gv.vim'
 Plug 'airblade/vim-gitgutter'
@@ -26,30 +35,36 @@ Plug 'kshenoy/vim-signature'
 Plug 'junegunn/vim-easy-align'
 
 " Utilities
+Plug 'junegunn/vim-emoji'
 Plug 'tpope/vim-surround'
 Plug 'tpope/vim-repeat'
 Plug 'Lokaltog/vim-easymotion'
+Plug 'machakann/vim-highlightedyank'
 Plug 'scrooloose/nerdcommenter'
 Plug 'sjl/gundo.vim'
 Plug 'SirVer/ultisnips'
 Plug 'vim-scripts/matchit.zip'
 Plug 'tomtom/tlib_vim'
+Plug 'junegunn/vader.vim'
 Plug 'MarcWeber/vim-addon-mw-utils'
-if s:darwin
-  Plug 'rizzatti/dash.vim',  { 'on': 'Dash' }
-endif
+Plug 'rizzatti/dash.vim',  { 'on': 'Dash' }
 
 " Syntax, Completion, Coding stuffs
-Plug 'sheerun/vim-polyglot'
+Plug 'editorconfig/editorconfig-vim'
 
-Plug 'klen/python-mode'
+Plug 'sheerun/vim-polyglot'
+Plug 'tmux-plugins/vim-tmux'
+
+Plug 'klen/python-mode', { 'branch' : 'develop' }
 Plug 'davidhalter/jedi-vim'
+Plug 'wookayin/vim-python-enhanced-syntax'
 
 Plug 'artur-shaik/vim-javacomplete2'
 
 Plug 'vim-pandoc/vim-pandoc'
 Plug 'vim-pandoc/vim-pandoc-syntax'
-Plug 'LaTeX-Box-Team/LaTeX-Box'
+"Plug 'LaTeX-Box-Team/LaTeX-Box'
+Plug 'lervag/vimtex', { 'for' : ['tex', 'plaintex'] }
 Plug 'gisraptor/vim-lilypond-integrator'
 Plug 'tfnico/vim-gradle'
 Plug 'Tyilo/applescript.vim'
@@ -64,7 +79,16 @@ if has('nvim')
 
     " in neovim, deoplete-jedi replaces jedi-vim
     Plug 'zchee/deoplete-jedi'
+
+    " C/C++ completion
     Plug 'zchee/deoplete-clang'
+
+elseif v:version >= 800
+
+    " Vim 8.0: Alternative async-completor plugin
+    " built-in support for python (jedi), java, etc.
+    Plug 'maralla/completor.vim'
+
 endif
 
 call plug#end()

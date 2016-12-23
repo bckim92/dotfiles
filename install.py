@@ -34,6 +34,7 @@ tasks = {
     '~/.zshrc'    : 'zsh/zshrc',
 
     # Bins
+    '~/.local/bin/dotfiles' : 'bin/dotfiles',
     '~/.local/bin/fasd' : 'zsh/fasd/fasd',
     '~/.local/bin/imgcat' : 'bin/imgcat',
     '~/.local/bin/imgls' : 'bin/imgls',
@@ -114,13 +115,13 @@ def log(msg, cr=True):
         stderr.write('\n')
 
 # command line arguments
-def option():
+def parse_option():
     parser = OptionParser()
     parser.add_option("-f", "--force", action="store_true", default=False)
     (options, args) = parser.parse_args()
     return options
 
-options = option()
+options = parse_option()
 
 # get current directory (absolute path) and options
 current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -128,10 +129,14 @@ os.chdir(current_dir)
 
 # check if git submodules are loaded properly
 stat = subprocess.check_output("git submodule status --recursive", shell=True)
-submodule_missing = [l.split()[1] for l in stat.split('\n') if len(l) and l[0] == '-']
+submodule_issues = [(l.split()[1], l[0]) for l in stat.split('\n') if len(l) and l[0] != ' ']
 
-if submodule_missing:
-    log(RED("git submodule %s does not exist!" % submodule_missing[0]))
+if submodule_issues:
+    stat_messages = {'+': 'needs update', '-': 'not initialized', 'U': 'conflict!'}
+    for (submodule_name, submodule_stat) in submodule_issues:
+        log(RED("git submodule {name} : {status}".format(
+            name=submodule_name,
+            status=stat_messages.get(submodule_stat, '(Unknown)'))))
     log(RED(" you may run: $ git submodule update --init --recursive"))
 
     log("")

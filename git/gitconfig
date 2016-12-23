@@ -13,6 +13,10 @@
 	# do not quote non-ascii characters; display unicodes as-is
 	quotepath = false
 
+[pager]
+	# Make sure the pager terminates when it hits on the end of log
+	log = less -FE
+
 [alias]
 	history = log --graph --pretty=format:'%C(yellow)%h%Creset \
 		-%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset' \

@@ -7,7 +7,7 @@
 #   Sorin Ionescu <sorin.ionescu@gmaiolcom>
 
 
-function prompt_wook_precmd {
+function prompt_wookmin_precmd {
   # A pre-command prompt hook function.
 
   setopt LOCAL_OPTIONS
@@ -22,10 +22,10 @@ function prompt_wook_precmd {
   # PWD
 
   # Ruby - RVM
-  #if (( $+functions[ruby-info] )); then
-  #  ruby-info on
-  #  ruby-info
-  #fi
+  if (( $+functions[ruby-info] )); then
+    ruby-info on
+    ruby-info
+  fi
 
   # Python - Virtualenv
   if (( $+functions[python-info] )); then
@@ -47,7 +47,7 @@ function prompt_wook_precmd {
   fi
 }
 
-function prompt_wook_setup {
+function prompt_wookmin_setup {
   setopt LOCAL_OPTIONS
   unsetopt XTRACE KSH_ARRAYS
   prompt_opts=(cr percent subst)
@@ -56,7 +56,7 @@ function prompt_wook_setup {
   autoload -Uz add-zsh-hook
 
   # Add hook that is executed before each command.
-  add-zsh-hook precmd prompt_wook_precmd
+  add-zsh-hook precmd prompt_wookmin_precmd
 
   # editor (vi-mode, etc ...)
   zstyle ':prezto:module:editor:info:keymap:primary' format '%B%F{red}❯%F{yellow}❯%(?.%F{green}.%F{red})❯%f%b'
@@ -84,7 +84,7 @@ function prompt_wook_setup {
     'rprompt' '%A%B%S%a%d%m%r%U%u'
 
   # Ruby - RVM
-  #zstyle ':prezto:module:ruby:info:version' format ' %F{magenta}%v%f'
+  zstyle ':prezto:module:ruby:info:version' format ' %F{magenta}%v%f'
 
   # Python virtualenv
   zstyle ':prezto:module:python:info:virtualenv' format ' %F{cyan}%v%f'
@@ -100,27 +100,14 @@ function prompt_wook_setup {
 
   # Define prompts.
   PROMPT='\
-%B%F{green}[\
-%B%F{yellow}%n\
-%B%F{green}@\
-%B%F{${PROMPT_HOST_COLOR}}%m\
-%B%F{green}: \
-%B%F{red}${PWD}%f%b\
-${git_info:+${(e)git_info[prompt]}}\
-%B%F{green}]\
-${python_info[virtualenv]}\
-${cuda_info}\
-${node_info[version]}\
-
 ${editor_info[keymap]} \
 '
-#${ruby_info[version]}\
 
-  RPROMPT='${git_info[rprompt]}'
+  RPROMPT='${cuda_info} ${python_info[virtualenv]} ${git_info[rprompt]}'
 
   SPROMPT='zsh: correct %F{red}%R%f to %F{green}%r%f [nyae]? '
 }
 
-prompt_wook_setup "$@"
+prompt_wookmin_setup "$@"
 
 # vim: set ft=zsh:
