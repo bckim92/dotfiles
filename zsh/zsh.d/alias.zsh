@@ -7,6 +7,16 @@ alias cp='nocorrect cp -iv'
 alias mv='nocorrect mv -iv'
 alias rm='nocorrect rm -iv'
 
+# list
+if command -v exa 2>&1 >/dev/null; then
+    # exa is our friend :)
+    alias ls='exa'
+    alias l='exa --long --group --git'
+else
+    # fallback to normal ls
+    alias l='ls'
+fi
+
 # Screen
 alias scr='screen -rD'
 
@@ -109,13 +119,22 @@ alias awk9="awk '{print \$9}'"
 alias awklast="awk '{print \$\(NF\)}'"
 
 
+# Codes ===================================== {{{
+
+alias prettyxml='xmllint --format - | pygmentize -l xml'
+
+# }}}
+
+
 # Etc ======================================= {{{
 
 # default watch options
 alias watch='watch --color -n1'
 
-# nvidia-smi every 1 sec
-alias smi='watch -n1 nvidia-smi'
+# nvidia-smi/gpustat every 1 sec
+#alias smi='watch -n1 nvidia-smi'
+alias watchgpu='watch --color -n0.2 gpustat'
+alias smi='watchgpu'
 
 function usegpu {
     export CUDA_VISIBLE_DEVICES=$1
