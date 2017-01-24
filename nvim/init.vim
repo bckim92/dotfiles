@@ -6,21 +6,18 @@
 " The 'neovim' package must be installed in that python:
 " e.g. /usr/bin/pip install neovim
 "  (or /usr/bin/pip3, /usr/local/bin/pip, depending environments)
+" The locally installed python (e.g. homebrew) at /usr/local/bin precedes.
 
-if has('mac')
-    let g:python_host_prog = '/usr/local/bin/python'
-else
+let g:python_host_prog  = '/usr/local/bin/python'
+if empty(glob("/usr/local/bin/python"))
+    " Fallback if not exists
     let g:python_host_prog = '/usr/bin/python'
-    if empty(glob("/usr/bin/python"))
-        " Fallback if not exists (e.g. Python3 in macOS)
-        let g:python_host_prog = '/usr/local/bin/python'
-    endif
 endif
 
-let g:python3_host_prog = '/usr/bin/python3'
-if empty(glob("/usr/bin/python3"))
-    " Fallback if not exists (e.g. Python3 in macOS)
-    let g:python3_host_prog = '/usr/local/bin/python3'
+let g:python3_host_prog = '/usr/local/bin/python3'
+if empty(glob("/usr/local/bin/python3"))
+    " Fallback if not exists
+    let g:python3_host_prog = '/usr/bin/python3'
 endif
 
 " VimR support {{{
