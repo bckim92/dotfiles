@@ -86,10 +86,6 @@ alias gva='gv --all'
 # virtualenv
 alias wo='workon'
 
-# override prezto's default
-# use 'py' command from pythonpy
-unalias py
-
 # ipython
 alias ipy='ipython'
 alias ipypdb='ipy -c "%pdb" -i'   # with auto pdb calling turned ON
@@ -128,6 +124,12 @@ alias prettyxml='xmllint --format - | pygmentize -l xml'
 
 # Etc ======================================= {{{
 
+# open some macOS applications
+if [[ "$(uname)" == "Darwin" ]]; then
+    alias typora='open -a Typora'
+fi
+
+
 # default watch options
 alias watch='watch --color -n1'
 
@@ -137,6 +139,7 @@ alias watchgpu='watch --color -n0.2 gpustat'
 alias smi='watchgpu'
 
 function usegpu {
+    export CUDA_DEVICE_ORDER=PCI_BUS_ID
     export CUDA_VISIBLE_DEVICES=$1
 }
 

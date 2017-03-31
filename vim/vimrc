@@ -325,7 +325,7 @@ nnoremap ; :
 " Useful leader key combinations {{{
 
 " <leader><space> : turn off search highlight
-nmap <leader><space> :noh<CR>
+nmap <silent> <leader><space> :noh<CR>
 
 " Plugin ag.vim
 " <leader>ag : Ag (search file contents)
@@ -929,5 +929,4 @@ endif
 
 " }}}
 
-" 'zo' for open a fold, or 'zR' for all folds
-" vim: set foldmethod=marker foldlevel=0:
+" vim: set ts=2 sts=2 sw=2:
