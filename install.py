@@ -81,7 +81,8 @@ post_actions = [
     '''
 
     # Run vim-plug installation
-    'vim +PlugInstall +qall',
+    #'vim +PlugInstall +qall',
+    'nvim +PlugInstall +qall',
 
     # Install tmux plugins via tpm
     '~/.tmux/plugins/tpm/bin/install_plugins',
