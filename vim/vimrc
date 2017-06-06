@@ -226,12 +226,6 @@ nnoremap <C-t>     :tabnew<CR>
 nnoremap <C-S-tab> :tabprevious<CR>
 nnoremap <C-tab>   :tabnext<CR>
 
-" Alternative tab navigations (@seealso gt, gT)
-" (terminals might capture <Ctrl-t> or something else)
-nnoremap <leader>tn  :tabnext<CR>
-nnoremap <leader>tp  :tabprev<CR>
-nnoremap <leader>tt  :tabnew<CR>
-
 " Handy tab navigations: <Alt-num>
 nnoremap 1 1gt
 nnoremap 2 2gt
@@ -614,6 +608,13 @@ endif
 let g:highlightedyank_highlight_duration = 1000
 
 " ---------------------------------------------------------------- }}}
+" editorconfig {{{
+
+let g:EditorConfig_core_mode = 'python_external'
+"let g:EditorConfig_core_mode = 'external_command'
+
+
+" ---------------------------------------------------------------- }}}
 " Airline {{{
 
 " use airline, with powerline-ish theme
@@ -623,8 +624,9 @@ let g:airline_powerline_fonts=1
 " enable tabline feature
 let g:airline#extensions#tabline#enabled = 1
 
-" do not display buffers in the tabline if there is only one tab
-let g:airline#extensions#tabline#show_buffers = 0
+" Display buffers (like tabs) in the tabline
+" if there is only one tab
+let g:airline#extensions#tabline#show_buffers = 1
 
 " suppress mixed-indent warning for javadoc-like comments (/** */)
 let g:airline#extensions#whitespace#mixed_indent_algo = 1
@@ -827,10 +829,11 @@ let g:pymode_lint_cwindow = 0
 let g:pymode_lint_ignore = "E401,E501"
 
 
-" For neovim, disable jedi's autocompletion behavior but
-" enable all the other features (e.g. goto, or refactoring)
-" The autocompletion is supported by deoplete-jedi.
-if has('nvim')
+" For neovim or vim8 (completor.vim),
+" disable jedi's autocompletion behavior but enable all the other features (e.g. goto, or refactoring)
+" The autocompletion is supported by deoplete-jedi or completor.vim.
+if has_key(g:plugs, 'deoplete-jedi') || has_key(g:plugs, 'completor.vim')
+"if has('nvim') || v:version >= 800
     " @see https://github.com/zchee/deoplete-jedi/issues/35
     let g:jedi#completions_enabled = 0
 endif
@@ -847,11 +850,13 @@ let g:jedi#smart_auto_mappings = 0
 " @see https://github.com/davidhalter/jedi-vim/issues/257
 let g:jedi#show_call_signatures = 0
 
-" make jedi-vim open a splitted window in the current tab
-" instead of opening a new tab (which can be done manually via :wincmd T),
+" jedi-vim opens buffer in the current tab (rather than a new tab)
 " when goto (e.g. goto definition) is performed
 let g:jedi#use_tabs_not_buffers = 0
-let g:jedi#use_splits_not_buffers = 'bottom'
+
+" window splits to open with; for now, it is disabled
+"let g:jedi#use_splits_not_buffers = 'bottom'
+"
 
 " ---------------------------------------------------------------- }}}
 " deoplete-clang {{{
@@ -876,11 +881,17 @@ endif
 
 let g:LatexBox_Folding = 1
 
+" suppress version warning
+let g:vimtex_disable_version_warning = 1
+
 let g:vimtex_mappings_enabled = 1
 
 " Disable callback feature if vim lacks feature +clientserver
 if ! (has('clientserver') || has('nvim'))
     let g:vimtex_latexmk_callback = 0
+
+    " see https://github.com/lervag/vimtex/issues/507
+    let g:vimtex_compiler_latexmk = {'callback' : 0}
 endif
 
 " in macOS, use Skim as the default LaTeX PDF viewer (for vimtex)

@@ -76,10 +76,38 @@ snippet PATH
 snippet jsondump
 	json.dumps(${1:object}, sort_keys=True, indent=4, separators=(',', ': '))
 #
-# Tensorflow
+# Common imports,
+# ML, Data Science, Tensorflow, ...
 #
+snippet np
+	import numpy as np
+
+snippet osp
+	import os.path as osp
+
+snippet PIL
+	from PIL import Image
+
+snippet xrange
+	from six.moves import xrange
+
+snippet tf
+	import tensorflow as tf
+snippet tflayers
+	import tensorflow.contrib.layers as layers
+snippet tfslim
+	import tensorflow.contrib.slim as slim
+
 snippet tfsession
 	session = tf.Session(config=tf.ConfigProto(
 	    gpu_options=tf.GPUOptions(allow_growth=True),
 	    device_count={'GPU': 1},
 	))
+snippet tfpdb
+	# XXX DEBUG tf breakpoint {{{
+	def _breakpoint_func(${2}):
+	    import pudb; pudb.set_trace()
+	    return False
+	with tf.control_dependencies(tf.py_func(_breakpoint_func, [$2], [tf.bool]))
+	    ${1:t} = tf.identity($1, name='debug_identity')
+	# XXX DEBUG }}}

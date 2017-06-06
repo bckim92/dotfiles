@@ -25,7 +25,7 @@ if has('nvim') || v:version >= 800
 endif
 Plug 'tpope/vim-tbone'
 Plug 'christoomey/vim-tmux-navigator'
-Plug 'tmux-plugins/vim-tmux-focus-events'
+Plug 'wookayin/vim-tmux-focus-events'   "A patched version of mine
 Plug 'tpope/vim-fugitive'
 Plug 'junegunn/gv.vim'
 Plug 'airblade/vim-gitgutter'
@@ -83,9 +83,11 @@ if has('nvim')
 
     " in neovim, deoplete-jedi replaces jedi-vim
     Plug 'zchee/deoplete-jedi'
-
     " C/C++ completion
     Plug 'zchee/deoplete-clang'
+    " vimscript
+    Plug 'machakann/vim-Verdin', { 'for': ['vim'] }
+
 
 elseif v:version >= 800
 
@@ -93,6 +95,11 @@ elseif v:version >= 800
     " built-in support for python (jedi), java, etc.
     Plug 'maralla/completor.vim'
 
+endif
+
+" Additional, optional local plugins
+if filereadable(expand("\~/.vim/plugins.local.vim"))
+    source \~/.vim/plugins.local.vim
 endif
 
 call plug#end()

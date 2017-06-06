@@ -13,6 +13,9 @@
 	# do not quote non-ascii characters; display unicodes as-is
 	quotepath = false
 
+	# editor
+	editor = vim
+
 [pager]
 	# Make sure the pager terminates when it hits on the end of log
 	log = less -FE
@@ -26,6 +29,7 @@
 	unstage = reset HEAD --
 	discard = checkout --
 	update-branch = branch -f --no-track
+	ub = branch -f --no-track
 
 	assume-unchanged = update-index --assume-unchanged
 	unassume-unchanged = update-index --no-assume-unchanged
