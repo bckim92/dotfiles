@@ -55,8 +55,11 @@ install_neovim() {
 }
 
 install_clang() {
+    # http://apt.llvm.org/
+    sudo add-apt-repository "deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-4.0 main"
+    sudo add-apt-repository "deb-src http://apt.llvm.org/trusty/ llvm-toolchain-trusty-4.0 main"
     sudo apt-get update
-    sudo apt-get install -y clang
+    sudo apt-get install -y clang-4.0
 }
 
 install_latest_tmux() {
