@@ -25,7 +25,9 @@ endif
 syntax on
 set nocompatible
 
-set shell=/bin/zsh
+if filereadable('/bin/zsh')
+  set shell=/bin/zsh
+endif
 
 " use path '~/.vim' even on non-unix machine
 set runtimepath+=~/.vim
@@ -84,6 +86,8 @@ set wildignore=*.swp,*.swo,*.class
 
 " status line
 set laststatus=2            " show anytime
+set noshowmode              " don't display mode, e.g. '-- INSERT --'
+set showcmd
 
 
 " native customized statusline, if airline is not available
@@ -91,7 +95,9 @@ set laststatus=2            " show anytime
 set statusline=%1*%{winnr()}\ %*%<\ %f\ %h%m%r%=%l,%c%V\ (%P)
 
 " mouse behaviour
-set mouse=nvc
+if has('mouse')
+    set mouse=nvc
+endif
 if ! has('nvim')
     " vim only (not in neovim)
     set ttymouse=xterm2
@@ -115,9 +121,6 @@ set noswapfile
 set nobackup
 
 " miscellanious
-set showmode
-set showcmd
-
 set visualbell
 set history=1000
 set undolevels=1000
@@ -600,7 +603,7 @@ map zg/ <Plug>(incsearch-fuzzy-stay)
 
 " ---------------------------------------------------------------- }}}
 " vim-highlightedyank {{{
-if ! has("nvim")
+if ! has("nvim") && has_key(g:plugs, 'vim-highlightedyank')
     map y <Plug>(highlightedyank)
 endif
 
@@ -787,6 +790,10 @@ let g:pandoc#spell#enabled = 0
 " ---------------------------------------------------------------- }}}
 " vim-javacomplete2 {{{
 autocmd FileType java setlocal omnifunc=javacomplete#Complete
+
+" ---------------------------------------------------------------- }}}
+" echodoc.vim {{{
+let g:echodoc#enable_at_startup = 1
 
 " ---------------------------------------------------------------- }}}
 " deoplete.nvim {{{

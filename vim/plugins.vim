@@ -40,9 +40,14 @@ Plug 'tpope/vim-surround'
 Plug 'tpope/vim-repeat'
 Plug 'Lokaltog/vim-easymotion'
 Plug 'haya14busa/vim-asterisk'
-"Plug 'haya14busa/incsearch.vim'
-"Plug 'haya14busa/incsearch-fuzzy.vim'
-Plug 'machakann/vim-highlightedyank'
+Plug 'haya14busa/incsearch.vim'
+Plug 'haya14busa/incsearch-fuzzy.vim'
+
+if v:version >= 800 || v:version == 704 && has('patch786')
+    " requires vim 7.4.786+ (see issue #23)
+    Plug 'machakann/vim-highlightedyank'
+endif
+
 Plug 'scrooloose/nerdcommenter'
 Plug 'sjl/gundo.vim'
 Plug 'SirVer/ultisnips'
@@ -74,6 +79,9 @@ Plug 'tfnico/vim-gradle'
 Plug 'Tyilo/applescript.vim'
 Plug 'rdolgushin/groovy.vim'
 
+Plug 'Shougo/echodoc.vim'
+
+
 if has('nvim')
     function! DoRemote(arg)
         UpdateRemotePlugins
@@ -88,6 +96,8 @@ if has('nvim')
     " vimscript
     Plug 'machakann/vim-Verdin', { 'for': ['vim'] }
 
+    " gdb integration
+    Plug 'huawenyu/neogdb.vim'
 
 elseif v:version >= 800
 
