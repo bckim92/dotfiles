@@ -24,6 +24,7 @@ if has('nvim') || v:version >= 800
     Plug 'neomake/neomake'
 endif
 Plug 'tpope/vim-tbone'
+Plug 'szw/vim-maximizer'    " zoom and unzoom!
 Plug 'christoomey/vim-tmux-navigator'
 Plug 'wookayin/vim-tmux-focus-events'   "A patched version of mine
 Plug 'tpope/vim-fugitive'
@@ -49,12 +50,14 @@ if v:version >= 800 || v:version == 704 && has('patch786')
 endif
 
 Plug 'scrooloose/nerdcommenter'
+Plug 'junegunn/vim-peekaboo'
 Plug 'sjl/gundo.vim'
 Plug 'SirVer/ultisnips'
 Plug 'vim-scripts/matchit.zip'
 Plug 'tomtom/tlib_vim'
 Plug 'junegunn/vader.vim'
 Plug 'MarcWeber/vim-addon-mw-utils'
+Plug 'tpope/vim-eunuch'
 Plug 'rizzatti/dash.vim',   { 'on': 'Dash' }
 Plug 'wookayin/vim-typora', { 'on': 'Typora' }
 
@@ -95,9 +98,6 @@ if has('nvim')
     Plug 'zchee/deoplete-clang'
     " vimscript
     Plug 'machakann/vim-Verdin', { 'for': ['vim'] }
-
-    " gdb integration
-    Plug 'huawenyu/neogdb.vim'
 
 elseif v:version >= 800
 

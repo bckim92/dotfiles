@@ -1,9 +1,45 @@
+# Styles
+# ================================
+snippet bf
+	{\bf ${1}}$0
+snippet emph
+	\emph{${1}}$0
+snippet tbf
+	\textbf{${1}}$0
+snippet textbf
+	\textbf{${1}}$0
+snippet tit
+	\textit{${1}}$0
+snippet textit
+	\textit{${1}}$0
+snippet tsf
+	\textsf{${1}}$0
+snippet textsf
+	\textsf{${1}}$0
+snippet mbf
+	\mathbf{${1}}$0
+snippet mathbf
+	\mathbf{${1}}$0
+snippet mrm
+	\mathrm{${1}}$0
+snippet mathrm
+	\mathrm{${1}}$0
+#
 # Document Blocks and Environments
 # ================================
 snippet $$ Math equation block
 	$$
 	    ${0}
 	$$
+snippet \{ Curly braces
+	\left\\{ ${0} \right\\}
+snippet [ Square bracket
+	\left[ ${0} \right]
+snippet ( Parenthesis
+	\left( ${0} \right)
+snippet < Angle
+	\left\langle ${0} \right\rangle
+#
 snippet \begin \begin{} ... \end{} block
 	\begin{${1:env}}
 	    ${0}
@@ -14,6 +50,9 @@ snippet begin \begin{} ... \end{} block
 snippet align \begin{align} ... \end{align} block
 	\begin{align}${0}
 	\end{align}
+snippet align* \begin{align*} ... \end{align*} block
+	\begin{align*}${0}
+	\end{align*}
 snippet aligned \begin{aligned} ... \end{aligned} block
 	\begin{aligned}${0}
 	\end{aligned}
@@ -38,11 +77,15 @@ snippet verbatim \begin{verbatim} ... \end{verbatim} block
 snippet tabular \begin{tabular} ... \end{tabular} block
 	\begin{tabular}{${2:c}}${0}
 	\end{tabular}
+snippet enumerate \begin{enumerate} ... \end{enumerate} block
+	\begin{enumerate}${0}
+	\end{enumerate}
 snippet enum \begin{enumerate} ... \end{enumerate} block
 	\begin{enumerate}${0}
 	\end{enumerate}
 snippet item \begin{itemize} ... \end{itemize} block
-	\begin{itemize}\item ${0}
+	\begin{itemize}
+	    \item ${0}
 	\end{itemize}
 #
 # Math Shortcuts
@@ -70,11 +113,15 @@ snippet matrix 2X2 matrix (or other)
 #
 # Useful Preamble Things
 # ======================
-snippet preamble Load useful preambles
-	\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+snippet hyperref
+	\usepackage[pagebackref=true,breaklinks=true,colorlinks,bookmarks=false]{hyperref}
+snippet argmin Define \argmin
 	\newcommand{\argmin}{\operatornamewithlimits{argmin}}
+snippet argmax Define \argmax
+	\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+snippet norm Define \norm command
 	\newcommand\norm[1]{\left\lVert#1\right\rVert}
-snippet tightlist Preambles for \tightlist
+snippet tightlist Define \tightlist
 	\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 #
 snippet deftodo

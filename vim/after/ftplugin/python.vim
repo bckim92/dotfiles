@@ -8,7 +8,8 @@ setlocal expandtab
 setlocal ts=4
 setlocal sw=4
 setlocal sts=4
-setlocal cc=80
+setlocal cc=100
+setlocal tw=100
 
 " braceless.vim
 silent! BracelessEnable +indent +highlight
@@ -18,6 +19,10 @@ silent! BracelessEnable +indent +highlight
 " @see jedi-vim issues #429
 " @see g:jedi#auto_vim_configuration
 set completeopt-=longest
+
+" Prevent vim from removing indentation on python comments
+" https://stackoverflow.com/questions/2360249/
+inoremap # X<BS>#
 
 
 " shortcuts

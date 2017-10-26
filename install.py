@@ -12,6 +12,14 @@ print('''
    https://dotfiles.wook.kr/
 ''')
 
+import argparse
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('-f', '--force', action="store_true", default=False,
+                    help='If specified, it will override existing symbolic links')
+parser.add_argument('--vim-plug', default='update', choices=['update', 'install', 'none'],
+                    help='vim plugins: update and install (default), install only, or do nothing')
+args = parser.parse_args()
+
 ################# BEGIN OF FIXME #################
 
 # Task Definition
@@ -47,6 +55,7 @@ tasks = {
     # Bins
     '~/.local/bin/dotfiles' : 'bin/dotfiles',
     '~/.local/bin/fasd' : 'zsh/fasd/fasd',
+    '~/.local/bin/is_mosh' : 'zsh/is_mosh/is_mosh',
     '~/.local/bin/imgcat' : 'bin/imgcat',
     '~/.local/bin/imgls' : 'bin/imgls',
     '~/.local/bin/fzf' : '~/.fzf/bin/fzf', # fzf is at $HOME/.fzf
@@ -78,11 +87,12 @@ post_actions = [
         source ${HOME}/.zshrc      # source zplug and list plugins
         zplug clear                # clear cache
         zplug install"             # install!
-    '''
+    ''',
 
     # Run vim-plug installation
-    #'vim +PlugInstall +qall',
-    'nvim +PlugInstall +qall',
+    {'install' : 'vim +PlugInstall +qall',
+     'update'  : 'vim +PlugUpdate +qall',
+     'none'    : ''}[args.vim_plug],
 
     # Install tmux plugins via tpm
     '~/.tmux/plugins/tpm/bin/install_plugins',
@@ -137,16 +147,8 @@ def log(msg, cr=True):
     if cr:
         stderr.write('\n')
 
-# command line arguments
-def parse_option():
-    parser = OptionParser()
-    parser.add_option("-f", "--force", action="store_true", default=False)
-    (options, args) = parser.parse_args()
-    return options
 
-options = parse_option()
-
-# get current directory (absolute path) and options
+# get current directory (absolute path)
 current_dir = os.path.abspath(os.path.dirname(__file__))
 os.chdir(current_dir)
 
@@ -193,7 +195,7 @@ for target, source in sorted(tasks.items()):
 
     # if --force option is given, delete and override the previous symlink
     if os.path.lexists(target):
-        if options.force:
+        if args.force:
             if os.path.islink(target):
                 os.unlink(target)
             else:
@@ -222,6 +224,8 @@ for target, source in sorted(tasks.items()):
         ))
 
 for action in post_actions:
+    if not action:
+        continue
     log(CYAN('Executing: ') + action.strip().split('\n')[0])
     subprocess.call(['bash', '-c', action],
                     preexec_fn=lambda: signal(SIGPIPE, SIG_DFL))

@@ -188,8 +188,9 @@ noremap <C-j> <C-w>j
 noremap <C-k> <C-w>k
 noremap <C-l> <C-w>l
 
-nnoremap <tab> <c-w>w
-nnoremap <S-tab> <c-w>W
+" zoom and unzoom (like tmux) -- by 'vim-maximizer'
+nnoremap <C-w>z :MaximizerToggle<CR>
+
 
 
 " in terminal mode (neovim)
@@ -255,7 +256,7 @@ nnoremap ]l :lnext<CR>
 " use Make (vim-dispatch) or Neomake (neomake)
 if has_key(g:plugs, 'neomake')
     " neomake; always use the bang version so that :copen can sync
-    command! -nargs=0 -bang TheMake Neomake!
+    command! -nargs=0 -bang TheMake cexpr [] | Neomake!
     command! -nargs=0 TheCopen copen
 else
     " vim-dispatch
@@ -290,16 +291,26 @@ if has_key(g:plugs, 'vim-dispatch')
     " <leader-F5>: run make with visible progress (split window in tmux)
     map  <leader><F5> <ESC>:w<CR>:RunMake!<CR>
 
-    " <F6>: show quickfix window (scroll bottom)
-    map  <F6> :TheCopen<CR>G
-    imap <F6> <ESC>:TheCopen<CR>G:wincmd w<CR>a
 else
     " otherwise, fallback to default make
     map <F5> <ESC>:w<CR>:make!<CR>
     imap <F5> <ESC>:w<CR>:make!<CR>a
 endif
 
+" Alternative to <F5>
+map <leader>m <F5>
+
 " }}}
+
+" <F6>: show/close quickfix window (scroll bottom)
+function! QuickfixToggle()
+  let nr = winnr("$")
+  :TheCopen
+  let nr2 = winnr("$")
+  if nr == nr2 | cclose | endif
+endfunction
+map  <silent> <F6> :call QuickfixToggle()<CR>
+imap <silent> <F6> <ESC>:call QuickfixToggle()<CR>G:wincmd w<CR>a
 
 
 " [F4] Next Error [Shift+F4] Previous Error
@@ -334,7 +345,11 @@ xnoremap <silent> <leader>ag y:Ag <C-R>"<CR>
 nmap <leader>cd :cd %:p:h<CR>
 
 " <leader>r : screen sucks, redraw everything
-nnoremap <leader>r :redraw!<CR>
+function! Redraw()
+  redraw!
+  call s:auto_termguicolors()   " re-detect true colors
+endfunction
+nnoremap <leader>r :call Redraw()<CR>
 
 " <leader>src : source ~/.vimrc
 nnoremap <leader>src :source ~/.vimrc<CR>
@@ -421,8 +436,40 @@ if &term =~ '256color'
     set t_ut=
 endif
 
+" 24-bit true color: neovim 0.1.5+ / vim 7.4.1799+
+" enable ONLY if TERM is set valid and it is NOT under mosh
+function! s:is_mosh()
+  let output = system("is_mosh -v")
+  if v:shell_error
+    return 0
+  endif
+  return !empty(l:output)
+endfunction
+
+function s:auto_termguicolors()
+  if !(has("termguicolors"))
+    return
+  endif
+
+  if (&term == 'xterm-256color' || &term == 'nvim') && !s:is_mosh()
+    set termguicolors
+  else
+    set notermguicolors
+  endif
+endfunction
+call s:auto_termguicolors()
+
+
 " apply base theme
 silent! colorscheme xoria256
+
+" airline theme: status line and tab line
+if has("termguicolors") && &termguicolors
+  let g:airline_theme='deus'
+else
+  let g:airline_theme='bubblegum'
+endif
+
 
 " override more customized colors
 highlight StatusLine    ctermfg=LightGreen
@@ -436,6 +483,18 @@ highlight Comment       ctermfg=035 guifg=#38B04A
 highlight Constant      ctermfg=204 guifg=#ff5f87
 highlight PreProc       ctermfg=219 guifg=#ffafff
 highlight SpecialKey    ctermfg=242 guifg=#666666
+
+" colors for gui/24bit mode {{
+" DiffAdd - inserted lines (dark green)
+highlight DiffAdd       guibg=#103a05 guifg=NONE
+" DiffDelete - deleted/filler lines (gray 246)
+highlight DiffDelete    guibg=#949494
+" DiffChange - changed lines (dark red)
+highlight DiffChange    guibg=#471515 guifg=NONE
+" DiffChange - changed 'text'(brighter red)
+highlight DiffText      guibg=#721b1b guifg=NONE
+" }}
+
 
 " no underline, current cursor line
 highlight CursorLine    cterm=none
@@ -482,8 +541,8 @@ autocmd BufWinLeave * call clearmatches()
 autocmd InsertLeave * silent! set nopaste
 
 " better popup menu colors (instead of dark black)
-highlight Pmenu ctermfg=black ctermbg=yellow
-highlight PmenuSel ctermfg=red ctermbg=white gui=bold
+highlight Pmenu ctermfg=black ctermbg=yellow guifg=black guibg=#ffec99
+highlight PmenuSel ctermfg=red ctermbg=white guifg=red guibg=white gui=bold
 
 " http://vim.wikia.com/wiki/Identify_the_syntax_highlighting_group_used_at_the_cursor
 function! ShowSyntaxGroup()
@@ -619,9 +678,9 @@ let g:EditorConfig_core_mode = 'python_external'
 
 " ---------------------------------------------------------------- }}}
 " Airline {{{
+" Note: for airline theme, see the 'appearance' section
 
 " use airline, with powerline-ish theme
-let g:airline_theme='bubblegum'
 let g:airline_powerline_fonts=1
 
 " enable tabline feature
@@ -639,6 +698,37 @@ let g:airline#extensions#whitespace#mixed_indent_algo = 1
 
 " so that ':Neomake clean' invokes 'make clean'
 let g:neomake_clean_maker = { 'exe': 'make', 'args': ['clean'] }
+
+" General hook/callback on starting and finishing jobs {
+function! s:OnNeomakeStart(context)
+  " what will we do?
+endfunction
+
+function! s:OnNeomakeFinished(context)
+  let l:context = g:neomake_hook_context
+
+  " If there is any failed job (non-zero exit code), notify it.
+  let l:failure_message = ""
+  for job in l:context['finished_jobs']
+    if l:job['exit_code'] != 0
+      let l:failure_message = printf("%s%s ", l:failure_message, l:job['as_string']())
+    endif
+  endfor
+  if ! empty(l:failure_message)
+    echom "Job Finished, FAIL: " . l:failure_message
+    copen | wincmd p   " copen, but not move to the quickfix window
+  else
+    echom "Job Finished, Success."
+  endif
+endfunction
+
+augroup neomake_hooks_common
+  au!
+  autocmd User NeomakeJobInit  call s:OnNeomakeStart(g:neomake_hook_context)
+  autocmd User NeomakeFinished call s:OnNeomakeFinished(g:neomake_hook_context)
+augroup END
+" }
+
 
 " ---------------------------------------------------------------- }}}
 " FZF {{{
@@ -798,6 +888,21 @@ let g:echodoc#enable_at_startup = 1
 " ---------------------------------------------------------------- }}}
 " deoplete.nvim {{{
 let g:deoplete#enable_at_startup = 1
+
+
+" Register some default omnicomplete functions/patterns
+" to automatically trigger in deoplete {{
+let g:deoplete#omni#functions = get(g:, 'deoplete#omni#functions', {})
+let g:deoplete#omni#input_patterns = get(g:, 'deoplete#omni#input_patterns', {})
+
+let g:deoplete#omni#functions.tex = ['vimtex#complete#omnifunc']
+let g:deoplete#omni#input_patterns.tex =
+      \ '(?:'
+      \ . '\\\w*'
+      \ . ')'
+
+" }}
+
 
 " ---------------------------------------------------------------- }}}
 " python (pymode, jedi) {{{
