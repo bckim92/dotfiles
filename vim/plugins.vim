@@ -10,6 +10,7 @@ call plug#begin('~/.vim/plugged')
 Plug 'flazz/vim-colorschemes'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
+Plug 'embear/vim-localvimrc'
 
 " Integration and Interfaces
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all --no-update-rc' }
@@ -25,6 +26,7 @@ if has('nvim') || v:version >= 800
 endif
 Plug 'tpope/vim-tbone'
 Plug 'szw/vim-maximizer'    " zoom and unzoom!
+Plug 'junegunn/goyo.vim'
 Plug 'christoomey/vim-tmux-navigator'
 Plug 'wookayin/vim-tmux-focus-events'   "A patched version of mine
 Plug 'tpope/vim-fugitive'
@@ -43,6 +45,10 @@ Plug 'Lokaltog/vim-easymotion'
 Plug 'haya14busa/vim-asterisk'
 Plug 'haya14busa/incsearch.vim'
 Plug 'haya14busa/incsearch-fuzzy.vim'
+Plug 't9md/vim-quickhl'
+if executable('diff')
+    Plug 'machakann/vim-highlightedundo'
+endif
 
 if v:version >= 800 || v:version == 704 && has('patch786')
     " requires vim 7.4.786+ (see issue #23)

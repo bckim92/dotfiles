@@ -110,7 +110,8 @@ alias ipynb0='ipynb --ip=0.0.0.0'
 # pip install nose, rednose
 alias nt='NOSE_REDNOSE=1 nosetests -v'
 
-# green: in verbose mode
+# unit test: in verbose mode
+alias pytest='pytest -vv'
 alias green='green -vv'
 
 # }}}
@@ -138,6 +139,8 @@ alias prettyxml='xmllint --format - | pygmentize -l xml'
 
 # Etc ======================================= {{{
 
+alias iterm-tab-color="noglob iterm-tab-color"
+
 # open some macOS applications
 if [[ "$(uname)" == "Darwin" ]]; then
 
@@ -148,6 +151,8 @@ if [[ "$(uname)" == "Darwin" ]]; then
     function skim     { open -a Skim $@ }
     compdef '_files -g "*.pdf"' skim
 
+    # terminal-notifier
+    function notify   { terminal-notifier -message "$*" }
 fi
 
 

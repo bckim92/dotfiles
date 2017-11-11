@@ -151,6 +151,9 @@ if ! has('nvim')
     endif
 endif
 
+" When opening http urls using netrw, follow 302 redirects
+let g:netrw_http_cmd = 'curl -L -o'
+
 " }}}
 """""""""""""""""""""""""""""""""""""""""
 " 2. Key and Functional Mappings {{{
@@ -594,6 +597,12 @@ endif
 """""""""""""""""""""""""""""""""""""""""
 
 " ----------------------------------------------------------------
+" vim-localvimrc {{{
+
+" store and restore all decisions on whether to load lvimrc
+let g:localvimrc_persistent = 2
+
+" ---------------------------------------------------------------- }}}
 " vim-polyglot {{{
 
 " in favor of python-mode and vimtex ...
@@ -668,6 +677,28 @@ endif
 
 "hi HighlightedyankRegion cterm=reverse gui=reverse
 let g:highlightedyank_highlight_duration = 1000
+
+" ---------------------------------------------------------------- }}}
+" vim-quickhl {{{
+
+nmap <leader>* <Plug>(quickhl-manual-this)
+xmap <leader>* <Plug>(quickhl-manual-this)
+nmap <leader>8 <Plug>(quickhl-manual-reset)
+xmap <leader>8 <Plug>(quickhl-manual-reset)
+
+" ---------------------------------------------------------------- }}}
+" vim-highlightedundo {{{
+
+if has_key(g:plugs, 'vim-highlightedundo')
+  nmap u     <Plug>(highlightedundo-undo)
+  nmap <C-r> <Plug>(highlightedundo-redo)
+  nmap U     <Plug>(highlightedundo-Undo)
+  nmap g-    <Plug>(highlightedundo-gminus)
+  nmap g+    <Plug>(highlightedundo-gplus)
+
+  let g:highlightedundo#highlight_duration_delete = 500
+  let g:highlightedundo#highlight_duration_add = 700
+endif
 
 " ---------------------------------------------------------------- }}}
 " editorconfig {{{
@@ -1023,6 +1054,7 @@ nnoremap <leader>gs :Gstatus<CR>:20wincmd +<CR>
 nnoremap <leader>gw :Gwrite<CR>
 nnoremap <leader>gb :Gblame -w<CR>:vertical resize 10<CR>
 nnoremap <leader>gci :Gcommit --verbose<CR>
+nnoremap <leader>gcA :Gcommit --amend --verbose<CR>
 
 " on commit, type 'cA' to enter in amend mode
 au FileType gitcommit nnoremap <buffer> <silent>
