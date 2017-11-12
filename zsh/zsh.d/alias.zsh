@@ -30,7 +30,8 @@ alias scr='screen -rD'
 #if command -v nvim 2>&1 >/dev/null; then
 #    alias vim='nvim'
 #fi
-alias vi='vim'
+#alias vi='vim'
+alias vi='nvim'
 
 # Just open ~/.vimrc
 alias vimrc='vim +cd\ ~/.vim -O ~/.vim/vimrc ~/.vim/plugins.vim'
