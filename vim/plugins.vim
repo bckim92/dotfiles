@@ -11,6 +11,7 @@ Plug 'flazz/vim-colorschemes'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'embear/vim-localvimrc'
+Plug 'tweekmonster/helpful.vim', { 'on' : ['HelpfulVersion'] }
 
 " Integration and Interfaces
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all --no-update-rc' }
@@ -39,6 +40,7 @@ Plug 'junegunn/vim-easy-align'
 
 " Utilities
 Plug 'junegunn/vim-emoji'
+Plug 'cocopon/colorswatch.vim', { 'on' : ['ColorSwatchGenerate'] }
 Plug 'tpope/vim-surround'
 Plug 'tpope/vim-repeat'
 Plug 'Lokaltog/vim-easymotion'
@@ -46,7 +48,7 @@ Plug 'haya14busa/vim-asterisk'
 Plug 'haya14busa/incsearch.vim'
 Plug 'haya14busa/incsearch-fuzzy.vim'
 Plug 't9md/vim-quickhl'
-if executable('diff')
+if executable('diff') && has('patch-7.4.1685')
     Plug 'machakann/vim-highlightedundo'
 endif
 
@@ -73,7 +75,7 @@ Plug 'editorconfig/editorconfig-vim'
 Plug 'sheerun/vim-polyglot'
 Plug 'tmux-plugins/vim-tmux'
 
-Plug 'klen/python-mode', { 'branch' : 'develop' }
+Plug 'klen/python-mode', { 'branch': 'develop' }
 Plug 'davidhalter/jedi-vim'
 Plug 'wookayin/vim-python-enhanced-syntax'
 
@@ -111,6 +113,11 @@ elseif v:version >= 800
     " built-in support for python (jedi), java, etc.
     Plug 'maralla/completor.vim'
 
+endif
+
+" Asynchronous Lint Engine (ALE)
+if has('nvim') || v:version >= 800
+    Plug 'w0rp/ale'
 endif
 
 " Additional, optional local plugins

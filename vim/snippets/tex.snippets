@@ -87,6 +87,8 @@ snippet item \begin{itemize} ... \end{itemize} block
 	\begin{itemize}
 	    \item ${0}
 	\end{itemize}
+snippet paragraph
+	\paragraph{${1}} $0
 #
 # Math Shortcuts
 # ==============
@@ -138,11 +140,20 @@ snippet defabbr
 	    {\emph{etc}}%
 	    {\emph{etc.}\@\xspace}%
 	}\makeatother
+#
+snippet defparagraph Redefine \paragraph to allow configuration of margins around
+	\makeatletter
+	\renewcommand{\paragraph}{%
+	  \@startsection{paragraph}{4}%
+	  {\z@}{${1:1.0ex} \@plus ${2:0.50ex} \@minus ${3:0.20ex}}{-1em}%
+	  {\normalfont\normalsize\bfseries}%
+	}
+	\makeatother
 
 
 # Figure, etc.
 # ============
-snippet graphics
+snippet includegraphics
 	\includegraphics[width=\textwidth]{${1:filename.png}}
 #
 snippet figure

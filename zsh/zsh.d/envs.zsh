@@ -9,6 +9,11 @@
 # @see https://github.com/junegunn/fzf/issues/526
 export FZF_CTRL_R_OPTS='--sort'
 
+# Setting fd as the default source for Ctrl-T fzf
+if (( $+commands[fd] )); then
+    export FZF_CTRL_T_COMMAND='fd --type f'
+fi
+
 # ALT-C: FASD_CD with preview
 export FZF_ALT_C_COMMAND='fasd_cd -d -l -R'
 export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -200'"
@@ -24,6 +29,10 @@ export SAVEHIST=100000
 unsetopt SHARE_HISTORY
 setopt NO_SHARE_HISTORY
 
+# See zsh-autoswitch-virtualenv #19
+unsetopt AUTO_NAME_DIRS       # Do not auto add variable-stored paths
+
+
 # Anaconda3 {{{
 if [ -d $HOME/.anaconda3/bin/ ]; then
   path=( $path $HOME/.anaconda3/bin )
@@ -31,8 +40,9 @@ fi
 # }}}
 
 # GO {{{
-export GOPATH=$HOME/.go
-path=( $path $GOPATH/bin )
+export GOROOT=$HOME/.go
+export GOPATH=$GOROOT/packages
+path=( $path $GOROOT/bin $GOPATH/bin )
 # }}}
 
 # Bazel {{{

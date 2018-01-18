@@ -18,6 +18,7 @@ parser.add_argument('-f', '--force', action="store_true", default=False,
                     help='If specified, it will override existing symbolic links')
 parser.add_argument('--vim-plug', default='update', choices=['update', 'install', 'none'],
                     help='vim plugins: update and install (default), install only, or do nothing')
+parser.add_argument('--skip-zplug', action='store_true')
 args = parser.parse_args()
 
 ################# BEGIN OF FIXME #################
@@ -77,17 +78,21 @@ tasks = {
 
     # pip and python
     #'~/.pip/pip.conf' : 'pip/pip.conf',
-    '~/.pythonrc.py' : 'pythonrc.py',
+    '~/.pythonrc.py' : 'python/pythonrc.py',
+    '~/.pylintrc' : 'python/pylintrc',
+    '~/.condarc' : 'python/condarc',
 }
 
 post_actions = [
     # zplug installation
     '''# Install zplug and clear cache
     zsh -c "
-        source ${HOME}/.zshrc      # source zplug and list plugins
-        zplug clear                # clear cache
-        zplug install"             # install!
-    ''',
+        source ${HOME}/.zshrc                   # source zplug and list plugins
+        zplug clear                             # clear cache
+        zplug install || zplug update "         # install or update
+    ''' \
+        if not args.skip_zplug \
+        else '',
 
     # validate neovim package installation
     '''# neovim package needs to be installed
@@ -207,7 +212,9 @@ for target, source in sorted(tasks.items()):
 
     # if --force option is given, delete and override the previous symlink
     if os.path.lexists(target):
-        if args.force:
+        is_broken_link = os.path.islink(target) and not os.path.exists(os.readlink(target))
+
+        if args.force or is_broken_link:
             if os.path.islink(target):
                 os.unlink(target)
             else:

@@ -72,6 +72,12 @@ set smartcase               " case-sensitive if keyword contains both uppercase 
 set incsearch
 set hlsearch
 
+if has('nvim')
+  " live preview of substitute command, with a split window
+  " @seealso http://vimcasts.org/episodes/neovim-eyecandy/
+  set inccommand=split
+endif
+
 " use spaces for tabbing, by default
 set expandtab
 
@@ -163,9 +169,11 @@ let g:netrw_http_cmd = 'curl -L -o'
 let mapleader=","           " comma is the <Leader> key.
 let maplocalleader=","      " comma : <LocalLeader>
 
+inoremap <silent> <C-k> <ESC>:update<CR>
+
 " navigation key mapping
-map k gk
-map j gj
+map <silent> k gk
+map <silent> j gj
 sunmap k
 sunmap j
 
@@ -315,6 +323,14 @@ endfunction
 map  <silent> <F6> :call QuickfixToggle()<CR>
 imap <silent> <F6> <ESC>:call QuickfixToggle()<CR>G:wincmd w<CR>a
 
+" <leader>L: show/close location list window
+function! LocListToggle()
+  let nr = winnr("$")
+  :lopen
+  let nr2 = winnr("$")
+  if nr == nr2 | lclose | endif
+endfunction
+map  <silent> <leader>L :call LocListToggle()<CR>
 
 " [F4] Next Error [Shift+F4] Previous Error
 map <F4> <ESC>:cn<CR>
@@ -325,6 +341,9 @@ map [29~ <ESC>:cp<CR>
 " [F2] save
 imap <F2> <ESC>:w<CR>
 map <F2> <ESC><ESC>:w<CR>
+
+" save in the insert mode?
+inoremap <C-S> <ESC>:update<CR>a
 
 " Sudo Save (:Wsudo command)
 command! Wsudo w !sudo tee % > /dev/null
@@ -339,20 +358,27 @@ nnoremap ; :
 nmap <silent> <leader><space> :noh<CR>
 
 " Plugin ag.vim
-" <leader>ag : Ag (search file contents)
+" <leader>ag (or rg): Ag (search file contents)
 nnoremap <leader>ag :Ag! -i ""<Left>
 xnoremap <silent> <leader>ag y:Ag <C-R>"<CR>
+nnoremap <leader>rg :Ag! -i ""<Left>
+xnoremap <silent> <leader>rg y:Ag <C-R>"<CR>
+
+if executable("rg")
+  " Use ripgrep instead :)
+  let g:ag_prg="rg --no-heading --vimgrep"
+endif
 
 
 " <leader>cd : switch to the directory of the current buffer
 nmap <leader>cd :cd %:p:h<CR>
 
-" <leader>r : screen sucks, redraw everything
+" <leader>R : screen sucks, redraw everything
 function! Redraw()
   redraw!
   call s:auto_termguicolors()   " re-detect true colors
 endfunction
-nnoremap <leader>r :call Redraw()<CR>
+nnoremap <leader>R :call Redraw()<CR>
 
 " <leader>src : source ~/.vimrc
 nnoremap <leader>src :source ~/.vimrc<CR>
@@ -393,7 +419,7 @@ map  <leader>s} ysiw}
 noremap <silent> <leader>z :silent exec "!tmux resize-pane -Z"<CR>
 
 " Prevent accidental <Ctrl-A> on Tmux
-if $TERM =~ 'screen'
+if !empty($TMUX)
     nnoremap <C-a> <nop>
     " To increase numbers, press <comma>, <c-a>, a ...?
     nnoremap <leader><C-a> <C-a>
@@ -936,14 +962,48 @@ let g:deoplete#omni#input_patterns.tex =
 
 
 " ---------------------------------------------------------------- }}}
+" ALE {{{
+
+" Specify linters.
+" You may find the configuration file for each linter engine useful.
+"  (e.g. ~/.pylintrc for pylint)
+let g:ale_linters = {
+      \ 'python': ['pylint', 'mypy', 'pycodestyle'],
+      \}
+
+let g:ale_type_map = {
+      \ 'pycodestyle' : {'ES' : 'WS', 'E': 'W'}
+      \}
+
+" linter-specific settings
+let g:ale_python_mypy_options = '--ignore-missing-imports'
+
+" Also show which linter is showing the message
+let g:ale_echo_msg_format = '[%linter%] %code: %%s'
+
+" better error/warning sign
+let g:ale_sign_error = '✘'
+let g:ale_sign_warning = '⚠'
+hi ALEErrorSign    gui=bold guifg=#e6645f ctermfg=167
+hi ALEWarningSign  gui=bold guifg=#b1b14d ctermfg=143
+
+" no highlight (underline) on detected errors/warnings
+let g:ale_set_highlights = 0
+
+" Show the number of errors/warnings in the airline statusbar
+let g:airline#extensions#ale#enabled = 1
+
+" Suppress a warning for the conflict with Neomake
+" Neomake is used for job execution, not a lint engine, so it would
+" be fine.
+let g:ale_emit_conflict_warnings = 0
+
+" ---------------------------------------------------------------- }}}
 " python (pymode, jedi) {{{
 
 " heavenshell/vim-pydocstring
 " Change default keymapping to <C-_> (default is <C-l>)
 nmap <silent> <C-_> <Plug>(pydocstring)
-
-" :Lint shortcut for :PymodeLint
-command! -nargs=0 Lint PymodeLint
 
 " disable code folding by default
 let g:pymode_folding = 0
@@ -959,6 +1019,13 @@ let g:pymode_run = 0
 " one might need to run 'pip install ipdb'
 let g:pymode_breakpoint_cmd = 'import ipdb; ipdb.set_trace()'
 
+" lint (code checking):
+" disable in favor of ALE, but only if pylint/pycodestyle exists
+let s:py_linters_exists = executable("pylint") || executable("pycodestyle")
+if has_key(g:plugs, 'ale') && s:py_linters_exists
+    let g:pymode_lint = 0
+endif
+
 " Check code on every save (not on the fly)
 let g:pymode_lint_on_write = 1
 let g:pymode_lint_unmodified = 1
@@ -969,7 +1036,7 @@ let g:pymode_lint_cwindow = 0
 " Skip some errors and warnings
 "  E401 : multiple imports on one line
 "  E501 : line too long
-let g:pymode_lint_ignore = "E401,E501"
+let g:pymode_lint_ignore = ["E401", "E501"]
 
 
 " For neovim or vim8 (completor.vim),
@@ -1060,6 +1127,11 @@ nnoremap <leader>gcA :Gcommit --amend --verbose<CR>
 au FileType gitcommit nnoremap <buffer> <silent>
             \ cA :bd<CR>:<C-U>Gcommit --verbose --amend<CR>
 
+" ---------------------------------------------------------------- }}}
+" gitgutter {{{
+
+" another alias for adding or staging hunk (same as <leader>ga)
+nmap <leader>ha  <Plug>GitGutterStageHunk
 
 " ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{

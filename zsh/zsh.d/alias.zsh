@@ -27,11 +27,10 @@ fi
 alias scr='screen -rD'
 
 # vim: Defaults to Neovim if exists
-#if command -v nvim 2>&1 >/dev/null; then
-#    alias vim='nvim'
-#fi
-#alias vi='vim'
-alias vi='nvim'
+if command -v nvim 2>&1 >/dev/null; then
+    alias vim='nvim'
+fi
+alias vi='vim'
 
 # Just open ~/.vimrc
 alias vimrc='vim +cd\ ~/.vim -O ~/.vim/vimrc ~/.vim/plugins.vim'
@@ -63,6 +62,9 @@ function tmuxp {
         command tmuxp $@;
     fi
 }
+
+alias set-pane-title='set-window-title'
+alias tmux-pane-title='set-window-title'
 
 # }}}
 # SSH ========================================= {{{
@@ -97,6 +99,9 @@ alias gva='gv --all'
 
 
 # Python ======================================= {{{
+
+# anaconda
+alias sa='source activate'
 
 # virtualenv
 alias wo='workon'
@@ -154,6 +159,13 @@ if [[ "$(uname)" == "Darwin" ]]; then
 
     # terminal-notifier
     function notify   { terminal-notifier -message "$*" }
+
+    # some commands that needs to work correctly in tmux
+    if [ -n "$TMUX" ] && (( $+commands[reattach-to-user-namespace] )); then
+        alias pngpaste='reattach-to-user-namespace pngpaste'
+        alias pbcopy='reattach-to-user-namespace pbcopy'
+        alias pbpaste='reattach-to-user-namespace pbpaste'
+    fi
 fi
 
 

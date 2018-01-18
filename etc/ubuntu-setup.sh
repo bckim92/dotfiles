@@ -19,6 +19,7 @@ install_essential_packages() {
         python-software-properties software-properties-common \
         cmake cmake-data ctags autoconf pkg-config \
         terminator htop iotop iftop \
+        unzip bzip2 gzip tar \
         silversearcher-ag \
         openssh-server mosh rdate \
         )
@@ -118,18 +119,18 @@ install_node() {
 
 install_exa() {
     # https://github.com/ogham/exa/releases
-    if _version_check "$(exa --version | cut -d' ' -f2)" "0.4.0"; then
+    if _version_check "$(exa --version | cut -d' ' -f2)" "0.8.0"; then
         echo "$(exa --version) : $(which exa)"
         echo "  Already installed, skipping installation"; return
     fi
 
     echo -e "${COLOR_WHITE}Downloading exa...${COLOR_NONE}"
-    EXA_DOWNLOAD_URL="https://github.com/ogham/exa/releases/download/v0.4.0/exa-linux-x86_64.zip"
-    EXA_BINARY_SHA1SUM="822ea64b390071298866ce84546811f57eb8503c"  # exa-linux-x86_64 v0.4.0
+    EXA_DOWNLOAD_URL="https://github.com/ogham/exa/releases/download/v0.8.0/exa-linux-x86_64-0.8.0.zip"
+    EXA_BINARY_SHA1SUM="6d0ced225106bef2c3ec90d8ca6d23eefd73eee5"  # exa-linux-x86_64 v0.8.0
     TMP_EXA_DIR="/tmp/exa/"
 
     wget -nc ${EXA_DOWNLOAD_URL} -P ${TMP_EXA_DIR} || exit 1;
-    cd ${TMP_EXA_DIR} && unzip -o "exa-linux-x86_64.zip" || exit 1;
+    cd ${TMP_EXA_DIR} && unzip -o "exa-linux-x86_64-0.8.0.zip" || exit 1;
     if [[ "$EXA_BINARY_SHA1SUM" != "$(sha1sum exa-linux-x86_64 | cut -d' ' -f1)" ]]; then
         echo -e "${COLOR_RED}SHA1 checksum mismatch, aborting!${COLOR_NONE}"
         exit 1;

@@ -5,6 +5,13 @@
 
 PREFIX="$HOME/.local/"
 
+COLOR_NONE="\033[0m"
+COLOR_RED="\033[0;31m"
+COLOR_GREEN="\033[0;32m"
+COLOR_YELLOW="\033[0;33m"
+COLOR_WHITE="\033[1;37m"
+
+
 install_zsh() {
     set -e
 
@@ -80,11 +87,11 @@ install_anaconda3() {
 
     # https://www.anaconda.com/download/
     TMP_DIR="/tmp/$USER/anaconda/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
-    wget -nc "https://repo.continuum.io/archive/Anaconda3-5.0.0.1-Linux-x86_64.sh"
+    wget -nc "https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh"
 
     # will install at $HOME/.anaconda3 (see zsh config for PATH)
     ANACONDA_PREFIX="$HOME/.anaconda3/"
-    bash "Anaconda3-5.0.0.1-Linux-x86_64.sh" -b -p ${ANACONDA_PREFIX}
+    bash "Anaconda3-5.0.1-Linux-x86_64.sh" -b -p ${ANACONDA_PREFIX}
 
     $ANACONDA_PREFIX/bin/python --version
 }
@@ -140,11 +147,63 @@ install_neovim() {
 }
 
 
+install_exa() {
+    # https://github.com/ogham/exa/releases
+    EXA_DOWNLOAD_URL="https://github.com/ogham/exa/releases/download/v0.8.0/exa-linux-x86_64-0.8.0.zip"
+    EXA_BINARY_SHA1SUM="6d0ced225106bef2c3ec90d8ca6d23eefd73eee5"  # exa-linux-x86_64 v0.8.0
+    TMP_EXA_DIR="/tmp/$USER/exa/"
+
+    wget -nc ${EXA_DOWNLOAD_URL} -P ${TMP_EXA_DIR} || exit 1;
+    cd ${TMP_EXA_DIR} && unzip -o "exa-linux-x86_64-0.8.0.zip" || exit 1;
+    if [[ "$EXA_BINARY_SHA1SUM" != "$(sha1sum exa-linux-x86_64 | cut -d' ' -f1)" ]]; then
+        echo -e "${COLOR_RED}SHA1 checksum mismatch, aborting!${COLOR_NONE}"
+        exit 1;
+    fi
+    cp "exa-linux-x86_64" "$PREFIX/bin/exa" || exit 1;
+    echo "$(which exa) : $(exa --version)"
+}
+
+
+install_fd() {
+    # install fd
+    set -e
+
+    TMP_FD_DIR="/tmp/$USER/fd"; mkdir -p $TMP_FD_DIR
+    FD_DOWNLOAD_URL="https://github.com/sharkdp/fd/releases/download/v6.0.0/fd-v6.0.0-x86_64-unknown-linux-musl.tar.gz"
+    echo $FD_DOWNLOAD_URL
+
+    cd $TMP_FD_DIR
+    curl -L $FD_DOWNLOAD_URL | tar -xvzf - --strip-components 1
+    cp "./fd" $PREFIX/bin
+    cp "./autocomplete/_fd" $PREFIX/share/zsh/site-functions
+
+    $PREFIX/bin/fd --version
+    echo "$(which fd) : $(fd --version)"
+}
+
+install_ripgrep() {
+    # install ripgrep
+    set -e
+
+    TMP_RIPGREP_DIR="/tmp/$USER/ripgrep"; mkdir -p $TMP_RIPGREP_DIR
+    RIPGREP_DOWNLOAD_URL="https://github.com/BurntSushi/ripgrep/releases/download/0.7.1/ripgrep-0.7.1-x86_64-unknown-linux-musl.tar.gz"
+    echo $RIPGREP_DOWNLOAD_URL
+
+    cd $TMP_RIPGREP_DIR
+    curl -L $RIPGREP_DOWNLOAD_URL | tar -xvzf - --strip-components 1
+    cp "./rg" $PREFIX/bin
+    cp "./complete/_rg" $PREFIX/share/zsh/site-functions
+
+    $PREFIX/bin/rg --version
+    echo "$(which exa) : $(rg --version)"
+}
+
+
 # entrypoint script
 if [ `uname` != "Linux" ]; then
     echo "Run on Linux (not on Mac OS X)"; exit 1
 fi
-if [ -n "$1" ]; then
+if [[ -n "$1" && "$1" != "--help" ]]; then
     $1
 else
     echo "Usage: $0 [command], where command is one of the following:"

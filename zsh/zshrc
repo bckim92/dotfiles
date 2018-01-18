@@ -38,7 +38,7 @@ zplug "modules/fasd", from:prezto, defer:2
 zplug "modules/git", from:prezto
 
 zplug "modules/ruby", from:prezto, if:"(( $+commands[ruby] ))"
-zplug "modules/node", from:prezto, if:"(( $+commands[node] ))"
+zplug "modules/node", from:prezto, if:"(( $+commands[node] )) || [[ -s $HOME/.nvm/nvm.sh ]]"
 
 
 # Dirty hacks for Prezto:
@@ -55,8 +55,11 @@ zplug "mafredri/zsh-async", from:github
 zplug "wookayin/pure", use:pure.zsh, from:github, as:theme
 
 # More ZSH widgets and utilities
-zplug 'zsh-users/zsh-autosuggestions'
+zplug 'zsh-users/zsh-autosuggestions', at:'v0.4.0'
 zplug 'MichaelAquilina/zsh-autoswitch-virtualenv'
+
+# fzf+fasd integration. Should be loaded after 'prezto:editor'
+zplug 'wookayin/fzf-fasd', defer:3
 
 # Additional zplug from ~/.zshrc.local
 if [[ -s "${ZDOTDIR:-$HOME}/.zshrc.local" ]]; then
