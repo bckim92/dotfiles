@@ -11,6 +11,23 @@ COLOR_GREEN="\033[0;32m"
 COLOR_YELLOW="\033[0;33m"
 COLOR_WHITE="\033[1;37m"
 
+install_ncurses() {
+    # installs ncurses (shared libraries and headers) into local namespaces.
+    set -e
+
+    TMP_NCURSES_DIR="/tmp/$USER/ncurses/"; mkdir -p $TMP_NCURSES_DIR
+    NCURSES_DOWNLOAD_URL="https://invisible-mirror.net/archives/ncurses/ncurses-5.9.tar.gz";
+
+    wget -nc -O $TMP_NCURSES_DIR/ncurses-5.9.tar.gz $NCURSES_DOWNLOAD_URL
+    tar -xvzf $TMP_NCURSES_DIR/ncurses-5.9.tar.gz -C $TMP_NCURSES_DIR --strip-components 1
+    cd $TMP_NCURSES_DIR
+
+    # compile as shared library, at ~/.local/lib/libncurses.so (as well as static lib)
+    export CPPFLAGS="-P"
+    ./configure --prefix="$PREFIX" --with-shared
+
+    make clean && make -j4 && make install
+}
 
 install_zsh() {
     set -e
@@ -21,6 +38,11 @@ install_zsh() {
     wget -nc -O $TMP_ZSH_DIR/zsh.tar.gz "https://sourceforge.net/projects/zsh/files/zsh/${ZSH_VER}/zsh-${ZSH_VER}.tar.gz/download"
     tar -xvzf $TMP_ZSH_DIR/zsh.tar.gz -C $TMP_ZSH_DIR --strip-components 1
     cd $TMP_ZSH_DIR
+
+    if [[ -d "$PREFIX/include/ncurses" ]]; then
+        export CFLAGS="-I$PREFIX/include/"
+        export LDFLAGS="-L$PREFIX/lib/"
+    fi
 
     ./configure --prefix="$PREFIX"
     make clean && make -j8 && make install
@@ -196,6 +218,27 @@ install_ripgrep() {
 
     $PREFIX/bin/rg --version
     echo "$(which exa) : $(rg --version)"
+}
+
+install_go() {
+    # install go lang into ~/.go
+    # https://golang.org/dl/
+    set -e
+    if [[ -d $HOME/.go ]]; then
+        echo -e "${COLOR_RED}Error: $HOME/.go already exists.${COLOR_NONE}"
+        exit 1;
+    fi
+
+    GO_DOWNLOAD_URL="https://dl.google.com/go/go1.9.3.linux-amd64.tar.gz"
+    TMP_GO_DIR="/tmp/$USER/go/"
+
+    wget -nc ${GO_DOWNLOAD_URL} -P ${TMP_GO_DIR} || exit 1;
+    cd ${TMP_GO_DIR} && tar -xvzf "go1.9.3.linux-amd64.tar.gz" || exit 1;
+    mv go $HOME/.go
+
+    echo ""
+    echo -e "${COLOR_GREEN}Installed at $HOME/.go${COLOR_NONE}"
+    $HOME/.go/bin/go version
 }
 
 

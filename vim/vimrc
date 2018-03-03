@@ -800,8 +800,8 @@ endif
 " :F is a shortcut for :GFiles or :FZF
 function! s:fzf_smart()
     let l:git_dir = fugitive#extract_git_dir(expand('%:p'))
-    " in a git repo, invoke :GFiles
-    if ! empty(l:git_dir) | GFiles
+    " in a git repo, invoke :GFiles (plus untracked files)
+    if ! empty(l:git_dir) | GFiles -c -o --exclude-standard
     " not in git repo, invoke :FZF by fallback
     else | FZF
     endif
@@ -847,6 +847,8 @@ nnoremap <leader>FG :Commits<CR>
 " History (recently opened files)
 nnoremap <leader>FH :History<CR>
 nnoremap <leader>H :History<CR>
+" :GS -> Git status (open modified file, etc.)
+command! GS GFiles?
 " :H goes to :History
 command! H History
 
@@ -1034,6 +1036,7 @@ let g:pymode_lint_unmodified = 1
 let g:pymode_lint_cwindow = 0
 
 " Skip some errors and warnings
+" see also ~/.config/pycodestyle (for ALE)
 "  E401 : multiple imports on one line
 "  E501 : line too long
 let g:pymode_lint_ignore = ["E401", "E501"]
