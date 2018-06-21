@@ -40,7 +40,7 @@ install_zsh() {
     cd $TMP_ZSH_DIR
 
     if [[ -d "$PREFIX/include/ncurses" ]]; then
-        export CFLAGS="-I$PREFIX/include/"
+        export CFLAGS="-I$PREFIX/include -I$PREFIX/include/ncurses"
         export LDFLAGS="-L$PREFIX/lib/"
     fi
 
@@ -77,7 +77,7 @@ install_tmux() {
     cd "tmux-2.5"
 
     ./configure --prefix="$PREFIX" \
-        CFLAGS="-I$PREFIX/include/" \
+        CFLAGS="-I$PREFIX/include/ -I$PREFIX/include/ncurses/" \
         LDFLAGS="-L$PREFIX/lib/" \
         PKG_CONFIG="/bin/false"
 
@@ -96,6 +96,11 @@ install_bazel() {
     mkdir -p $TMP_BAZEL_DIR
     wget -O $TMP_BAZEL_DIR/bazel-installer.sh $BAZEL_URL
 
+    # zsh completion
+    mkdir -p $HOME/.local/share/zsh/site-functions
+    wget -O $HOME/.local/share/zsh/site-functions/_bazel https://raw.githubusercontent.com/bazelbuild/bazel/master/scripts/zsh_completion/_bazel
+
+    # install bazel
     bash $TMP_BAZEL_DIR/bazel-installer.sh \
         --bin=$HOME/.local/bin \
         --base=$HOME/.bazel
@@ -106,14 +111,15 @@ install_anaconda3() {
     # installs Anaconda-python3.
     # https://www.anaconda.com/download/#linux
     set -e
+    ANACONDA_VERSION="5.2.0"
 
     # https://www.anaconda.com/download/
     TMP_DIR="/tmp/$USER/anaconda/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
-    wget -nc "https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh"
+    wget -nc "https://repo.continuum.io/archive/Anaconda3-${ANACONDA_VERSION}-Linux-x86_64.sh"
 
     # will install at $HOME/.anaconda3 (see zsh config for PATH)
     ANACONDA_PREFIX="$HOME/.anaconda3/"
-    bash "Anaconda3-5.0.1-Linux-x86_64.sh" -b -p ${ANACONDA_PREFIX}
+    bash "Anaconda3-${ANACONDA_VERSION}-Linux-x86_64.sh" -b -p ${ANACONDA_PREFIX}
 
     $ANACONDA_PREFIX/bin/python --version
 }

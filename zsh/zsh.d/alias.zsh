@@ -43,9 +43,12 @@ alias tmuxnew='tmux new -s'
 alias tmuxl='tmux list-sessions'
 # tmuxa <session> : attach to <session> (force 256color and detach others)
 alias tmuxa='tmux -2 attach-session -d -t'
+# tmux kill-session -t
+alias tmuxkill='tmux kill-session -t'
 
 # I am lazy, yeah
 alias t='tmuxa'
+alias T='TMUX= tmuxa'
 
 # tmuxp
 function tmuxp {
@@ -181,6 +184,10 @@ alias watch='watch --color -n1'
 #alias smi='watch -n1 nvidia-smi'
 alias watchgpu='watch --color -n0.2 "gpustat --color || gpustat"'
 alias smi='watchgpu'
+
+function watchgpucpu {
+    watch --color -n0.2 "gpustat --color; echo -n 'CPU '; cpu-usage | ascii-bar;"
+}
 
 function usegpu {
     gpu_id="$1"

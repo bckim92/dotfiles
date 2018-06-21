@@ -17,6 +17,13 @@ if filereadable(expand("\~/.vim/plugins.vim"))
     source \~/.vim/plugins.vim
 endif
 
+" Automatically install missing plugins on startup
+autocmd VimEnter *
+  \  if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
+  \|   PlugInstall --sync | q
+  \| endif
+
+
 " }}}
 """""""""""""""""""""""""""""""""""""""""
 " 1. General Settings {{{
@@ -159,6 +166,11 @@ endif
 
 " When opening http urls using netrw, follow 302 redirects
 let g:netrw_http_cmd = 'curl -L -o'
+
+" terminal mode (neovim)
+if has('nvim')
+  au TermOpen * setlocal nonumber norelativenumber
+endif
 
 " }}}
 """""""""""""""""""""""""""""""""""""""""
@@ -961,6 +973,10 @@ let g:deoplete#omni#input_patterns.tex =
       \ . ')'
 
 " }}
+
+
+" ---------------------------------------------------------------- }}}
+" semshi {{{
 
 
 " ---------------------------------------------------------------- }}}
