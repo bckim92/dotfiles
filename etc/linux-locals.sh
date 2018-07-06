@@ -125,6 +125,24 @@ install_anaconda3() {
 }
 
 
+install_miniconda3() {
+    # installs Miniconda-python3.
+    # https://conda.io/miniconda.html
+    set -e
+    MINICONDA_VERSION="4.5.4"
+
+    # https://repo.continuum.io/miniconda/
+    TMP_DIR="/tmp/$USER/miniconda/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
+    wget -nc "https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh"
+
+    # will install at $HOME/.miniconda3 (see zsh config for PATH)
+    MINICONDA_PREFIX="$HOME/.miniconda3/"
+    bash "Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh" -b -p ${MINICONDA_PREFIX}
+
+    $MINICONDA_PREFIX/bin/python --version
+}
+
+
 install_vim() {
     # install latest vim
     set -e

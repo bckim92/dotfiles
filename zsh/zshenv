@@ -106,3 +106,13 @@ export PYTHONSTARTUP=$HOME/.pythonrc.py
 
 # Disable dot files in archive
 export COPYFILE_DISABLE=true
+
+#
+# Paths
+#
+
+# Miniconda3 {{{
+if [ -d $HOME/.miniconda3/bin/ ]; then
+  . $HOME/.miniconda3/etc/profile.d/conda.sh
+fi
+# }}}
