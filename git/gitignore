@@ -26,11 +26,12 @@ Thumbs.db
 .settings/
 .ipynb_checkpoints/
 
-# Python, Virtualenv
+# Python, Virtualenv, Condaenv
 .venv*
 .mypy_cache
 __pycache__
 *.py[cod]
+.cenv*
 
 # Etc
 npm-debug.log
