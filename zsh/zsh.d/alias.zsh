@@ -32,8 +32,9 @@ if command -v nvim 2>&1 >/dev/null; then
 fi
 alias vi='vim'
 
-# Just open ~/.vimrc
+# Just open ~/.vimrc, ~/.zshrc, etc.
 alias vimrc='vim +cd\ ~/.vim -O ~/.vim/vimrc ~/.vim/plugins.vim'
+alias zshrc='vim +cd\ ~/.zsh -O ~/.zsh/zshrc ~/.zpreztorc'
 
 # Tmux ========================================= {{{
 
@@ -155,6 +156,12 @@ fi
 
 alias iterm-tab-color="noglob iterm-tab-color"
 
+if (( $+commands[pydf] )); then
+    # pip install --user pydf
+    # pydf: a colorized df
+    alias df="pydf"
+fi
+
 # open some macOS applications
 if [[ "$(uname)" == "Darwin" ]]; then
 
@@ -202,5 +209,8 @@ function usegpu {
     export CUDA_VISIBLE_DEVICES=$gpu_id
 }
 
+if (( ! $+commands[tb] )); then
+    alias tb='python -m tbtools.tb'
+fi
 
 # }}}

@@ -35,12 +35,13 @@ zstyle ':prezto:load' pmodule \
   'rsync' \
   'completion' \
   'prompt' \
-  'syntax-highlighting' \
   'fasd' \
   'ruby' \
   'python' \
   'node' \
   'git'
+
+  #'syntax-highlighting' \
 
 #
 # Editor
@@ -93,9 +94,10 @@ zstyle ':prezto:module:editor' key-bindings 'vi'
 # Set the prompt theme to load.
 # Setting it to 'random' loads a random theme.
 # Auto set to 'off' on dumb terminals.
-# [WARNING] it might not be used, see ~/.zshrc
-zstyle ':prezto:module:prompt' theme 'wook'
-#zstyle ':prezto:module:prompt' theme 'steeef'
+#
+# [WARNING] it is not used, see ~/.zshrc (in favor of theme plugin, e.g. 'pure')
+#
+# zstyle ':prezto:module:prompt' theme 'wook'
 
 #
 # Ruby
@@ -135,6 +137,9 @@ zstyle ':prezto:module:prompt' theme 'wook'
 #   'cursor' \
 #   'root'
 #
+
+# {!!!!!!!} NOT USED ANYMORE !!!
+#           ---------------- in favor of fast-syntax-highlighting
 # Set syntax highlighting styles.
 # @see https://github.com/zsh-users/zsh-syntax-highlighting/blob/master/highlighters/main/main-highlighter.zsh
 zstyle ':prezto:module:syntax-highlighting' styles \

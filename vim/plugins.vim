@@ -10,8 +10,10 @@ call plug#begin('~/.vim/plugged')
 Plug 'flazz/vim-colorschemes'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
-Plug 'embear/vim-localvimrc'
 Plug 'tweekmonster/helpful.vim', { 'on' : ['HelpfulVersion'] }
+if has('patch-7.4.1154')  " requires v:false
+  Plug 'embear/vim-localvimrc'
+endif
 
 " Integration and Interfaces
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all --no-update-rc' }
@@ -107,6 +109,8 @@ if has('nvim')
     Plug 'zchee/deoplete-clang'
     " vimscript
     Plug 'machakann/vim-Verdin', { 'for': ['vim'] }
+    " zsh
+    Plug 'zchee/deoplete-zsh', { 'for': ['zsh'] }
 
 elseif v:version >= 800
 

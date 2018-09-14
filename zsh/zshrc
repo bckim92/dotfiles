@@ -46,13 +46,23 @@ if ! zgen saved; then
   zgen prezto
 
   # additional modules/plugins
+  # --------------------------
+
+  # zsh theme: pure (forked ver)
   zgen load mafredri/zsh-async
   zgen load wookayin/pure
 
+  # zsh syntax: FSH
+  # theme file (XDG:wook) is at ~/.config/fsh/wook.ini
+  zgen load zdharma/fast-syntax-highlighting
+  fast-theme "XDG:wook"
+
+  # misc.
   zgen load zsh-users/zsh-autosuggestions
   zgen load MichaelAquilina/zsh-autoswitch-virtualenv
   zgen load bckim92/zsh-autoswitch-conda
   zgen load wookayin/fzf-fasd
+
 
   zgen save
 
@@ -77,7 +87,7 @@ fi
 if (( $+commands[iterm-tab-color] )); then
     # set tab color, if it is a new connection to remote through SSH
     function iterm_tab_color_auto() {
-        if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ] && [ -n $PROMPT_HOST_COLOR ]; then
+        if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ] && [ -n "$PROMPT_HOST_COLOR" ]; then
             iterm-tab-color $PROMPT_HOST_COLOR
         fi
     }
