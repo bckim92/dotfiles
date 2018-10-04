@@ -70,6 +70,7 @@ Plug 'MarcWeber/vim-addon-mw-utils'
 Plug 'tpope/vim-eunuch'
 Plug 'rizzatti/dash.vim',   { 'on': 'Dash' }
 Plug 'wookayin/vim-typora', { 'on': 'Typora' }
+Plug 'liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
 
 " Syntax, Completion, Coding stuffs
 Plug 'editorconfig/editorconfig-vim'
@@ -93,6 +94,9 @@ Plug 'Tyilo/applescript.vim'
 Plug 'rdolgushin/groovy.vim'
 
 Plug 'Shougo/echodoc.vim'
+
+Plug 'xolox/vim-misc'
+Plug 'xolox/vim-lua-ftplugin', { 'for' : ['lua'] }
 
 
 if has('nvim')
@@ -122,7 +126,7 @@ endif
 
 " Asynchronous Lint Engine (ALE)
 if has('nvim') || v:version >= 800
-    Plug 'w0rp/ale'
+    Plug 'w0rp/ale', { 'tag': 'v2.1.1' }
 endif
 
 " Additional, optional local plugins

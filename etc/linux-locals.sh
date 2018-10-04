@@ -244,6 +244,26 @@ install_ripgrep() {
     echo "$(which exa) : $(rg --version)"
 }
 
+install_xsv() {
+    XSV_VERSION="0.13.0"
+
+    set -e; set -x
+    mkdir -p $PREFIX/bin && cd $PREFIX/bin
+    curl -L "https://github.com/BurntSushi/xsv/releases/download/${XSV_VERSION}/xsv-${XSV_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar zxf -
+    $PREFIX/bin/xsv
+}
+
+install_bat() {
+    BAT_VERSION="0.7.0"
+
+    set -e; set -x
+    mkdir -p $PREFIX/bin && cd $PREFIX/bin
+    curl -L "https://github.com/sharkdp/bat/releases/download/v${BAT_VERSION}/bat-v${BAT_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+        | tar zxf - --strip-components 1 --wildcards --no-anchored 'bat*'     # bat, bat.1
+
+    $PREFIX/bin/bat --version
+}
+
 install_go() {
     # install go lang into ~/.go
     # https://golang.org/dl/
@@ -270,9 +290,10 @@ install_go() {
 if [ `uname` != "Linux" ]; then
     echo "Run on Linux (not on Mac OS X)"; exit 1
 fi
-if [[ -n "$1" && "$1" != "--help" ]]; then
+if [[ -n "$1" && "$1" != "--help" ]] && declare -f "$1"; then
     $1
 else
     echo "Usage: $0 [command], where command is one of the following:"
     declare -F | cut -d" " -f3 | grep -v '^_'
+    exit 1;
 fi

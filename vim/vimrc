@@ -178,6 +178,7 @@ endif
 """""""""""""""""""""""""""""""""""""""""
 
 " the leader key
+" (NOTE) leader key is mapped to vim-which-key, see sections below
 let mapleader=","           " comma is the <Leader> key.
 let maplocalleader=","      " comma : <LocalLeader>
 
@@ -221,12 +222,18 @@ inoremap <C-C> <ESC>
 " in terminal mode (neovim)
 if has('nvim')
     " <C-\><C-n> is the key sequence for escaping form terminal mode
-    " <c-[> and double <C-\> also goes for escaping from terminal
-    tnoremap <C-[> <C-\><C-n>
-    tnoremap <C-\><C-\> <C-\><C-n>
+    " double <ESC> and double <C-\> also goes for escaping from terminal,
+    " whereas single <ESC> would be directly passed inside the terminal.
+    tnoremap <silent> <C-[><C-[> <C-\><C-n>
+    tnoremap <silent> <C-\><C-\> <C-\><C-n>
 
     " Automatically enter insert mode when entering neovim terminal buffer
     autocmd BufWinEnter,WinEnter term://* startinsert
+    autocmd TermOpen * startinsert
+
+    " terminal in a new tab or vsplit buffer
+    command! -nargs=* Term :tabnew | :term <args>
+    command! -nargs=* STerm :split | :term <args>
 
     " Mapping for <c-hjkl> in terminal mode
     " <c-h> might not work: see https://github.com/neovim/neovim/issues/2048
@@ -250,10 +257,19 @@ nnoremap ]b  :bnext<CR>
 " Tab navigations
 nnoremap [t  :tabprevious<CR>
 nnoremap ]t  :tabnext<CR>
+if has('nvim')
+  tnoremap [t <C-\><C-n>:tabprevious<CR>
+  tnoremap ]t <C-\><C-n>:tabnext<CR>
+endif
 
 nnoremap <C-t>     :tabnew<CR>
-nnoremap <C-S-tab> :tabprevious<CR>
-nnoremap <C-tab>   :tabnext<CR>
+
+nnoremap <silent>   <C-S-tab> :tabprevious<CR>
+nnoremap <silent>   <C-tab>   :tabnext<CR>
+if has('nvim')
+  tnoremap <silent> <C-S-tab> <C-\><C-n>:tabprevious<CR>
+  tnoremap <silent> <C-tab>   <C-\><C-n>:tabnext<CR>
+endif
 
 " Handy tab navigations: <Alt-num>
 nnoremap 1 1gt
@@ -385,7 +401,15 @@ endif
 
 
 " <leader>cd : switch to the directory of the current buffer
-nmap <leader>cd :cd %:p:h<CR>
+function! s:cd()
+  cd %:p:h
+
+  " if NERDTree is open, chdir NERDTree as well
+  if exists("g:NERDTree") && g:NERDTree.IsOpen()
+    :NERDTreeCWD | wincmd w
+  endif
+endfunction
+nmap <silent> <leader>cd :call <SID>cd()<CR>
 
 " <leader>R : screen sucks, redraw everything
 function! Redraw()
@@ -489,7 +513,7 @@ function! s:is_mosh()
   return !empty(l:output)
 endfunction
 
-function s:auto_termguicolors()
+function! s:auto_termguicolors()
   if !(has("termguicolors"))
     return
   endif
@@ -741,6 +765,21 @@ if has_key(g:plugs, 'vim-highlightedundo')
 endif
 
 " ---------------------------------------------------------------- }}}
+" vim-which-key {{{
+
+" which-key buffer will appear vertically on the right
+let g:which_key_vertical = 1
+
+" Make timeout delay to be 300ms (before popup appears), default is 1000ms
+set timeoutlen=300
+
+" Remap <leader> key to vim-which-key version.
+" The following mapping assumes <leader> key is ',' (comma)
+if has_key(g:plugs, 'vim-which-key')
+  nnoremap <silent> <leader> :<c-u>WhichKey ','<CR>
+endif
+
+" ---------------------------------------------------------------- }}}
 " editorconfig {{{
 
 let g:EditorConfig_core_mode = 'python_external'
@@ -827,6 +866,41 @@ nmap <C-P> :F<CR>
 
 
 " custom commands using fzf
+" -------------------------
+
+" :Rg --- Easily grep
+" brought from https://github.com/junegunn/fzf.vim
+command! -bang -nargs=* Rg
+  \ call fzf#vim#grep(
+  \   'rg -i --column --line-number --no-heading --color=always '.shellescape(<q-args>), 1,
+  \   <bang>0 ? fzf#vim#with_preview('up:60%')
+  \           : fzf#vim#with_preview('right:50%:hidden', '?'),
+  \ <bang>0)
+
+" :Def, Rgdef -- Easily find definition/declaration (requires ripgrep)
+" e.g. :Def class, :Def def, :Def myfunc, :Def class MyClass
+command! -bang -nargs=* Rgdef   call s:fzf_rgdef(<q-args>, <bang>0)
+command! -bang -nargs=* Def     call s:fzf_rgdef(<q-args>, 1 - <bang>0)
+
+function! s:fzf_rgdef(args, bang0)
+    " TODO: currently, only python is supported.
+    let l:rgdef_type = '--type "py"'
+    let l:rgdef_prefix = '^\s*(def|class)'
+    let l:rgdef_pattern = l:rgdef_prefix.' \w*'.a:args.'\w*'
+
+    " if the query itself starts with prefix patterns, let itself be the regex pattern
+    if a:args =~ ('\v'.l:rgdef_prefix.'($|\s+)')
+      let l:rgdef_pattern = '^\s*'.a:args
+    endif
+
+    call fzf#vim#grep(
+  \   'rg -i --column --line-number --no-heading --color=always '.l:rgdef_type.' '.shellescape(l:rgdef_pattern), 1,
+  \   a:bang0 ? fzf#vim#with_preview('up:60%')
+  \           : fzf#vim#with_preview('right:50%:hidden', '?'),
+  \ a:bang0)
+endfunction
+
+
 
 " :Z -- cd to recent working directories using fasd
 command! -nargs=* Z call fzf#run
@@ -974,7 +1048,28 @@ let g:deoplete#omni#input_patterns.tex =
       \ . '\\\w*'
       \ . ')'
 
+let g:deoplete#omni#functions.lua = 'xolox#lua#omnifunc'
+let g:deoplete#omni#input_patterns.lua = '\w+|[^. *\t][.:]\w*'
+
 " }}
+
+" ---------------------------------------------------------------- }}}
+" Lua {{{
+" https://github.com/xolox/vim-lua-ftplugin
+"
+" See also:
+" https://github.com/Shougo/deoplete.nvim/issues/458      compatibility with deoplete
+" https://github.com/xolox/vim-lua-ftplugin/issues/40     if not working with Torch
+
+let g:lua_check_syntax = 1
+
+let g:lua_complete_omni = 1
+
+if has_key(g:plugs, 'deoplete.nvim')
+  let g:lua_complete_dynamic = 0    " deoplete will take care of this instead
+endif
+
+let g:lua_define_completion_mappings = 0
 
 
 " ---------------------------------------------------------------- }}}
@@ -1151,8 +1246,10 @@ au FileType gitcommit nnoremap <buffer> <silent>
 " ---------------------------------------------------------------- }}}
 " gitgutter {{{
 
-" another alias for adding or staging hunk (same as <leader>ga)
+" another alias for adding or staging hunk (similar as <leader>ga)
 nmap <leader>ha  <Plug>GitGutterStageHunk
+
+nmap <leader>hh  :GitGutterLineHighlightsToggle<CR>
 
 " ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{
