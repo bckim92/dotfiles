@@ -53,6 +53,8 @@ install_zsh() {
 install_tmux() {
     # install tmux (and its dependencies such as libevent) locally
     set -e
+    TMUX_VER="2.4"
+
     TMP_TMUX_DIR="/tmp/$USER/tmux/"; mkdir -p $TMP_TMUX_DIR
 
     # libevent
@@ -69,12 +71,12 @@ install_tmux() {
     # TODO: assuming that ncurses is available?
 
     # tmux
-    TMUX_TGZ_FILE="tmux-2.5.tar.gz"
-    TMUX_DOWNLOAD_URL="https://github.com/tmux/tmux/releases/download/2.5/${TMUX_TGZ_FILE}"
+    TMUX_TGZ_FILE="tmux-${TMUX_VER}.tar.gz"
+    TMUX_DOWNLOAD_URL="https://github.com/tmux/tmux/releases/download/${TMUX_VER}/${TMUX_TGZ_FILE}"
 
     wget -nc ${TMUX_DOWNLOAD_URL} -P ${TMP_TMUX_DIR}
     cd ${TMP_TMUX_DIR} && tar -xvzf ${TMUX_TGZ_FILE}
-    cd "tmux-2.5"
+    cd "tmux-${TMUX_VER}"
 
     ./configure --prefix="$PREFIX" \
         CFLAGS="-I$PREFIX/include/ -I$PREFIX/include/ncurses/" \
@@ -230,14 +232,17 @@ install_fd() {
 install_ripgrep() {
     # install ripgrep
     set -e
+    RIPGREP_VERSION="0.10.0"
 
     TMP_RIPGREP_DIR="/tmp/$USER/ripgrep"; mkdir -p $TMP_RIPGREP_DIR
-    RIPGREP_DOWNLOAD_URL="https://github.com/BurntSushi/ripgrep/releases/download/0.7.1/ripgrep-0.7.1-x86_64-unknown-linux-musl.tar.gz"
+    RIPGREP_DOWNLOAD_URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/ripgrep-${RIPGREP_VERSION}-x86_64-unknown-linux-musl.tar.gz"
     echo $RIPGREP_DOWNLOAD_URL
 
     cd $TMP_RIPGREP_DIR
     curl -L $RIPGREP_DOWNLOAD_URL | tar -xvzf - --strip-components 1
     cp "./rg" $PREFIX/bin
+
+    mkdir -p $HOME/.local/share/zsh/site-functions
     cp "./complete/_rg" $PREFIX/share/zsh/site-functions
 
     $PREFIX/bin/rg --version
@@ -254,7 +259,7 @@ install_xsv() {
 }
 
 install_bat() {
-    BAT_VERSION="0.7.0"
+    BAT_VERSION="0.8.0"
 
     set -e; set -x
     mkdir -p $PREFIX/bin && cd $PREFIX/bin

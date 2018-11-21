@@ -32,13 +32,19 @@ nmap <leader>A viega*&
 " ======================
 
 " default makeprg
-if !filereadable('Makefile')
+if filereadable('Makefile') || filereadable(expand("%:p:h") . "/Makefile")
+    let &l:makeprg = 'make'
+else
     let &l:makeprg = '(latexmk -pdf -pdflatex="pdflatex -halt-on-error -interaction=nonstopmode -file-line-error -synctex=1" "%:r" && latexmk -c "%:r")'
     "let &l:makeprg = 'xelatex -recorder -halt-on-error -interaction=nonstopmode -file-line-error -synctex=1 "%:r"'
 endif
 
 " If using neomake, run callbacks after make is done
 function! s:OnNeomakeFinished(context)
+    if ! exists(':VimtexView')
+      return
+    endif
+
     let l:context = g:neomake_hook_context
     " the buffer on which Neomake was invoked
     let l:bufnr = get(l:context['options'], 'bufnr', -1)
@@ -71,3 +77,20 @@ augroup tex_neomake_callback
     au!
     autocmd User NeomakeFinished call s:OnNeomakeFinished(g:neomake_hook_context)
 augroup END
+
+
+
+
+" FZF-based quickjump
+" ===================
+
+" :Sections
+" Quickly lookup all \section{...} and \subsection{...} definitions.
+" A limitation: can't recognize commands inside comments or verbatim, etc.
+command! -bang -nargs=* Sections
+  \ call fzf#vim#grep(
+  \   'rg -i --column --line-number --no-heading --color=always '
+  \.shellescape('^\\(sub)?section\{'.<q-args>), 1,
+  \   <bang>0 ? fzf#vim#with_preview({'options': '--reverse --no-sort'}, 'up:60%')
+  \           : fzf#vim#with_preview({'options': '--reverse --no-sort'}, 'right:50%', '?'),
+  \ <bang>0)

@@ -378,9 +378,6 @@ inoremap <C-S> <ESC>:update<CR>a
 " Sudo Save (:Wsudo command)
 command! Wsudo w !sudo tee % > /dev/null
 
-" handy command-line mode
-nnoremap ; :
-
 
 " Useful leader key combinations {{{
 
@@ -850,6 +847,17 @@ if executable("ag")
     let $FZF_DEFAULT_COMMAND = 'ag -l -g "" 2> /dev/null'
 endif
 
+" Customize built-in commands of 'vim-fzf' (overriden by commands here) {{{
+" For full list, @see https://github.com/junegunn/fzf.vim/blob/master/plugin/fzf.vim#L42
+
+" :GFiles (with preview), :GFiles? (git diff + preview)
+command! -bang -nargs=? GFiles     call fzf#vim#gitfiles(<q-args>, <q-args> != '?' ? (
+      \ <bang>0 ? fzf#vim#with_preview('up:90%')
+      \         : fzf#vim#with_preview('right:50%', '?')
+      \) : <bang>0
+      \)
+" }}}
+
 " :F is a shortcut for :GFiles or :FZF
 function! s:fzf_smart()
     let l:git_dir = fugitive#extract_git_dir(expand('%:p'))
@@ -864,6 +872,9 @@ command! -nargs=0 F call s:fzf_smart()
 " Invoke F (FZF) Using Ctrl-P
 nmap <C-P> :F<CR>
 
+" insert mode completion
+imap <c-x><c-k>   <plug>(fzf-complete-word)
+
 
 " custom commands using fzf
 " -------------------------
@@ -874,13 +885,13 @@ command! -bang -nargs=* Rg
   \ call fzf#vim#grep(
   \   'rg -i --column --line-number --no-heading --color=always '.shellescape(<q-args>), 1,
   \   <bang>0 ? fzf#vim#with_preview('up:60%')
-  \           : fzf#vim#with_preview('right:50%:hidden', '?'),
+  \           : fzf#vim#with_preview('right:50%', '?'),
   \ <bang>0)
 
 " :Def, Rgdef -- Easily find definition/declaration (requires ripgrep)
 " e.g. :Def class, :Def def, :Def myfunc, :Def class MyClass
 command! -bang -nargs=* Rgdef   call s:fzf_rgdef(<q-args>, <bang>0)
-command! -bang -nargs=* Def     call s:fzf_rgdef(<q-args>, 1 - <bang>0)
+command! -bang -nargs=* Def     call s:fzf_rgdef(<q-args>, <bang>0)
 
 function! s:fzf_rgdef(args, bang0)
     " TODO: currently, only python is supported.
@@ -896,7 +907,7 @@ function! s:fzf_rgdef(args, bang0)
     call fzf#vim#grep(
   \   'rg -i --column --line-number --no-heading --color=always '.l:rgdef_type.' '.shellescape(l:rgdef_pattern), 1,
   \   a:bang0 ? fzf#vim#with_preview('up:60%')
-  \           : fzf#vim#with_preview('right:50%:hidden', '?'),
+  \           : fzf#vim#with_preview('right:50%', '?'),
   \ a:bang0)
 endfunction
 
