@@ -99,3 +99,6 @@ fi
 
 # fzf
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# zsh-autoswitch-conda
+export AUTOSWITCH_DEFAULT_CONDAENV="default"
