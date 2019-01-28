@@ -195,3 +195,14 @@ snippet subfigure
 snippet newcolumntype
 	\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
 	%\setlength\tabcolsep{2pt}  % default value: 6pt
+#
+snippet table
+	\begin{table}[htb] \begin{center}
+		\small
+		\begin{tabular}{|c|}
+			\hline
+			\hline
+		\end{tabular}
+		\caption{${1:Caption here}}
+		\label{tab:${2:table1}}
+	\end{center} \end{table}
