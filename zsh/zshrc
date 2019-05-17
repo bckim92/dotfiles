@@ -63,6 +63,9 @@ if ! zgen saved; then
   zgen load bckim92/zsh-autoswitch-conda
   zgen load greymd/tmux-xpanes
   zgen load MichaelAquilina/zsh-you-should-use
+  if [[ "`uname`" == "Darwin" ]]; then
+    zgen load wookayin/anybar-zsh
+  fi
 
   zgen save
 

@@ -76,11 +76,23 @@ alias tmux-pane-title='set-window-title'
 # }}}
 # SSH ========================================= {{{
 
+if [[ "$(uname)" == "Darwin" ]] && (( $+commands[iterm-tab-color] )); then
+  ssh() {
+    command ssh $@
+    iterm-tab-color reset 2>/dev/null
+  }
+fi
+
 function ssh-tmuxa {
     host="$1"
-    ssh $host -t tmux attach -d -t "$2"
+    if [[ -z "$2" ]]; then
+       ssh $host -t tmux attach -d
+    else;
+       ssh $host -t tmux attach -d -t "$2"
+    fi
 }
-alias sshta=ssh-tmuxa
+alias sshta='ssh-tmuxa'
+alias ssh-ta='ssh-tmuxa'
 compdef '_hosts' ssh-tmuxa
 # }}}
 
@@ -167,6 +179,14 @@ if (( $+commands[pydf] )); then
     # pydf: a colorized df
     alias df="pydf"
 fi
+
+function site-packages() {
+    # print the path to the site packages from current python environment,
+    # e.g. ~/.anaconda3/envs/XXX/lib/python3.6/site-packages/
+
+    python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
+    # python -c "import site; print('\n'.join(site.getsitepackages()))"
+}
 
 # open some macOS applications
 if [[ "$(uname)" == "Darwin" ]]; then

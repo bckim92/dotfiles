@@ -29,7 +29,10 @@ autocmd VimEnter *
 " 1. General Settings {{{
 """""""""""""""""""""""""""""""""""""""""
 
+filetype plugin on
+filetype indent on
 syntax on
+
 set nocompatible
 
 if filereadable('/bin/zsh')
@@ -172,6 +175,23 @@ if has('nvim')
   au TermOpen * setlocal nonumber norelativenumber
 endif
 
+" Use nvr as git editor (inside neovim terminal)
+if has('nvim') && executable('nvr')
+  let $GIT_EDITOR = 'nvr -cc split --remote-wait'
+  autocmd FileType gitcommit set bufhidden=delete
+endif
+
+" For debugging
+function! ToggleVerbose()
+    if !&verbose
+        set verbosefile=~/.vim/verbose.log
+        set verbose=15
+    else
+        set verbose=0
+        set verbosefile=
+    endif
+endfunction
+
 " }}}
 """""""""""""""""""""""""""""""""""""""""
 " 2. Key and Functional Mappings {{{
@@ -214,6 +234,7 @@ noremap <C-l> <C-w>l
 
 " zoom and unzoom (like tmux) -- by 'vim-maximizer'
 nnoremap <C-w>z :MaximizerToggle<CR>
+let g:maximizer_set_default_mapping = 0         " do not map <F3>
 
 " well...?
 inoremap <C-C> <ESC>
@@ -234,6 +255,9 @@ if has('nvim')
     " terminal in a new tab or vsplit buffer
     command! -nargs=* Term :tabnew | :term <args>
     command! -nargs=* STerm :split | :term <args>
+    command! -nargs=* VTerm :split | :term <args>
+    command! -nargs=* TermSplit :split | :term <args>
+    command! -nargs=* TermVSplit :vsplit | :term <args>
 
     " Mapping for <c-hjkl> in terminal mode
     " <c-h> might not work: see https://github.com/neovim/neovim/issues/2048
@@ -253,13 +277,17 @@ endif
 " Buffer navigations
 nnoremap [b  :bprevious<CR>
 nnoremap ]b  :bnext<CR>
+if has('nvim')
+  nnoremap <silent> [b <C-\><C-n>:bprevious<CR>
+  nnoremap <silent> ]b <C-\><C-n>:bnext<CR>
+endif
 
 " Tab navigations
-nnoremap [t  :tabprevious<CR>
-nnoremap ]t  :tabnext<CR>
+nnoremap <silent> [t  :tabprevious<CR>
+nnoremap <silent> ]t  :tabnext<CR>
 if has('nvim')
-  tnoremap [t <C-\><C-n>:tabprevious<CR>
-  tnoremap ]t <C-\><C-n>:tabnext<CR>
+  tnoremap <silent> [t <C-\><C-n>:tabprevious<CR>
+  tnoremap <silent> ]t <C-\><C-n>:tabnext<CR>
 endif
 
 nnoremap <C-t>     :tabnew<CR>
@@ -398,7 +426,7 @@ endif
 
 
 " <leader>cd : switch to the directory of the current buffer
-function! s:cd()
+function! CD_to_file()
   cd %:p:h
 
   " if NERDTree is open, chdir NERDTree as well
@@ -406,7 +434,7 @@ function! s:cd()
     :NERDTreeCWD | wincmd w
   endif
 endfunction
-nmap <silent> <leader>cd :call <SID>cd()<CR>
+nmap <silent> <leader>cd :call CD_to_file()<CR>
 
 " <leader>R : screen sucks, redraw everything
 function! Redraw()
@@ -542,6 +570,13 @@ highlight ColorColumn   ctermbg=52 guibg=#5f0000
 highlight LineNr        ctermfg=248 ctermbg=233 guifg=#a8a8a8 guibg=#121212
 highlight SignColumn    ctermfg=248 ctermbg=233 guifg=#a8a8a8 guibg=#121212
 
+" gitgutter sign column (see afa4f2dd)
+"  guibg=<X> and ctermbg=<Y> should match that of "SignColumn"
+highlight GitGutterAdd    guifg=#009900 guibg=#121212 ctermfg=2 ctermbg=233
+highlight GitGutterChange guifg=#bbbb00 guibg=#121212 ctermfg=3 ctermbg=233
+highlight GitGutterDelete guifg=#ff2222 guibg=#121212 ctermfg=1 ctermbg=233
+
+" some primitive colors customized on top of xoria256
 highlight Normal        ctermfg=255 guifg=white
 highlight Comment       ctermfg=035 guifg=#38B04A
 highlight Constant      ctermfg=204 guifg=#ff5f87
@@ -570,13 +605,10 @@ augroup NrHighlight
     autocmd BufLeave * setlocal nocursorline
 augroup END
 
-" IDE settings
-filetype plugin on
-filetype indent on
-
 " filetype detections
 au BufRead,BufNewFile /etc/nginx/* if &ft == '' | setfiletype nginx | endif
 au BufRead,BufNewFile *.prototxt if &ft == '' | setfiletype yaml | endif
+au BufRead,BufNewFile *.ipynb if &ft == '' | setfiletype json | endif
 
 autocmd FileType git setlocal foldlevel=1
 
@@ -593,7 +625,7 @@ autocmd FileType c,cpp,java,javascript,html,ruby,python,pandoc
 
 " highlight trailing whitespaces
 highlight ExtraWhitespace ctermbg=red guibg=red
-autocmd FileType GV highlight clear ExtraWhitespace
+autocmd FileType GV,gitmessengerpopup highlight clear ExtraWhitespace
 
 match ExtraWhitespace /\s\+$/
 autocmd BufWinEnter * match ExtraWhitespace /\s\+$/
@@ -605,8 +637,19 @@ autocmd BufWinLeave * call clearmatches()
 autocmd InsertLeave * silent! set nopaste
 
 " better popup menu colors (instead of dark black)
-highlight Pmenu ctermfg=black ctermbg=yellow guifg=black guibg=#ffec99
-highlight PmenuSel ctermfg=red ctermbg=white guifg=red guibg=white gui=bold
+highlight Pmenu             ctermfg=black guifg=black ctermbg=yellow guibg=#ffec99
+highlight PmenuSel          ctermfg=red guifg=red ctermbg=white guibg=white gui=bold
+
+" neovim 0.4.0+ : semi-transparent popup menu
+if has('nvim') && has('termguicolors')
+  silent! set pumblend=20
+endif
+
+" neovim 0.4.0+ : Default background for floating windows (should be dark, not Pmenu)
+if hlexists('NormalFloat')
+  highlight NormalFloat     ctermbg=233 guibg=#121212
+endif
+
 
 " http://vim.wikia.com/wiki/Identify_the_syntax_highlighting_group_used_at_the_cursor
 function! ShowSyntaxGroup()
@@ -706,11 +749,13 @@ xnoremap <leader>emoji :Emoji<CR>
 " ---------------------------------------------------------------- }}}
 " vim-asterisk (enhanced *) {{{
 
-"' Use z (stay) behavior as default
-map *  <Plug>(asterisk-z*)
-map #  <Plug>(asterisk-z#)
-map g* <Plug>(asterisk-gz*)
-map g# <Plug>(asterisk-gz#)
+" Use z (stay) behavior as default
+if has_key(g:plugs, 'vim-asterisk')
+  map *  <Plug>(asterisk-z*)
+  map #  <Plug>(asterisk-z#)
+  map g* <Plug>(asterisk-gz*)
+  map g# <Plug>(asterisk-gz#)
+endif
 
 " Keep cursor position across matches
 let g:asterisk#keeppos = 1
@@ -732,7 +777,7 @@ map zg/ <Plug>(incsearch-fuzzy-stay)
 
 " ---------------------------------------------------------------- }}}
 " vim-highlightedyank {{{
-if ! has("nvim") && has_key(g:plugs, 'vim-highlightedyank')
+if has_key(g:plugs, 'vim-highlightedyank') && !exists('##TextYankPost')
     map y <Plug>(highlightedyank)
 endif
 
@@ -939,6 +984,17 @@ command! -nargs=* Plugs call fzf#run
             \ 'sink':    'NERDTree'
             \})
 
+" :SitePackages -- quickly jump to the site-packages directory for the current python
+command! -nargs=* SitePackages call fzf#run
+            \({
+            \ 'source':  ('python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())" ' .
+            \             ' | xargs -I{} find {}/ -maxdepth 1 -type d ' .
+            \             ' | grep -v "\(dist\|egg\)-info$" | grep -v "\.egg$" | sort'),
+            \ 'options': '--delimiter "/" --nth -1 +m ' . printf(' --query "%s"', <q-args>),
+            \ 'down':    '~33%',
+            \ 'sink':    'NERDTree',
+            \})
+
 " Leader key mappings for vim-fzf commands
 
 " List all open buffers
@@ -1017,6 +1073,16 @@ let g:EasyMotion_enter_jump_first = 1
 let g:EasyMotion_space_jump_first = 1
 
 " ---------------------------------------------------------------- }}}
+" quick-scope {{{
+
+" Trigger a highlight in the appropriate direction when pressing these keys:
+let g:qs_highlight_on_keys = ['f', 'F', 't', 'T']
+
+highlight QuickScopePrimary   guifg=#afff5f gui=underline ctermfg=155 cterm=underline
+highlight QuickScopeSecondary guifg=#5fffff gui=underline ctermfg=81  cterm=underline
+
+
+" ---------------------------------------------------------------- }}}
 " vim-easy-align {{{
 
 " Start interactive EasyAlign in visual mode (e.g. vipga)
@@ -1029,6 +1095,9 @@ nmap ga <Plug>(EasyAlign)
 let g:UltiSnipsExpandTrigger="<c-j>"
 let g:UltiSnipsJumpForwardTrigger="<c-j>"
 let g:UltiSnipsJumpBackwardTrigger="<c-k>"
+
+command! -nargs=0 UltiSnipsRefreshSnippets :call UltiSnips#RefreshSnippets()
+
 
 " ---------------------------------------------------------------- }}}
 " vim-pandoc {{{
@@ -1152,6 +1221,11 @@ let g:pymode_run = 0
 " one might need to run 'pip install ipdb'
 let g:pymode_breakpoint_cmd = 'import ipdb; ipdb.set_trace()'
 
+" show documentation: disable default keymap (K) if better plugins are present
+if has_key(g:plugs, 'coc.nvim')
+    let g:pymode_doc_bind = '<leader>PK'
+endif
+
 " lint (code checking):
 " disable in favor of ALE, but only if pylint/pycodestyle exists
 let s:py_linters_exists = executable("pylint") || executable("pycodestyle")
@@ -1181,7 +1255,7 @@ let g:pymode_lint_ignore = ["E401", "E501"]
 " disable jedi's autocompletion behavior but enable all the other features (e.g. goto, or refactoring)
 " The autocompletion is supported by deoplete-jedi or completor.vim.
 if has_key(g:plugs, 'deoplete-jedi') || has_key(g:plugs, 'completor.vim')
-"if has('nvim') || v:version >= 800
+            \ || has_key(g:plugs, 'coc.nvim')
     " @see https://github.com/zchee/deoplete-jedi/issues/35
     let g:jedi#completions_enabled = 0
 endif
@@ -1233,6 +1307,11 @@ endif
 " ---------------------------------------------------------------- }}}
 " LaTeX {{{
 
+let g:vimtex_syntax_enabled = 1
+
+" Always prefer latex instead of plain, etc.
+let g:tex_flavor = "latex"
+
 let g:LatexBox_Folding = 1
 
 " suppress version warning
@@ -1274,10 +1353,26 @@ au FileType gitcommit nnoremap <buffer> <silent>
 " ---------------------------------------------------------------- }}}
 " gitgutter {{{
 
-" another alias for adding or staging hunk (similar as <leader>ga)
+" For colors for gitgutter signs (see afa4f2dd),
+" please see above (search for "/SignColumn")
+
+" Another alias for adding or staging hunk (similar as <leader>ga).
+" for other keys (e.g <leader>hu, <leader>hp), please see
+"  :help gitgutter-<Leader>
 nmap <leader>ha  <Plug>GitGutterStageHunk
 
 nmap <leader>hh  :GitGutterLineHighlightsToggle<CR>
+
+" ---------------------------------------------------------------- }}}
+" git-messenger {{{
+
+" map <C-O>/<C-I> to jumping to older and Older(recent) commits,
+" respectively (see git-messenger#3)
+au FileType gitmessengerpopup nmap <buffer> <C-O> o
+au FileType gitmessengerpopup nmap <buffer> <C-I> O
+
+" Display content diff as well in the popup window
+let g:git_messenger_include_diff = 1
 
 " ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{
@@ -1289,11 +1384,67 @@ nnoremap <leader>G :GundoToggle<CR>
 nnoremap <leader>T :TagbarToggle<CR>
 
 " ---------------------------------------------------------------- }}}
+" coc.nvim (languag server completion) {{{
+
+if has_key(g:plugs, 'coc.nvim')
+
+  " For general settings, try :CocConfig
+  " (or ~/.config/nvim/coc-settings.json)
+  au BufRead coc-settings.json    syntax match Comment +\/\/.\+$+
+
+  if has('nvim-0.4.0')
+    " coc.nvim is being actively developed and changing;
+    " Prefer a compiled code instead of a prebuilt binary
+    let g:coc_force_debug = 1
+  endif
+
+  " Appearance and highlight groups  (see also: NormalFloat)
+  highlight CocFloating       ctermbg=236 guibg=#292c3a
+
+  " Use <c-space> for trigger coc completion (rather than omnicomplete)
+  inoremap <silent><expr> <c-space> coc#refresh()
+
+  " Use <cr> for confirm completion, `<C-g>u` means break undo chain at current position.
+  " Coc only does snippet and additional edit on confirm.
+  inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
+
+  " Go to definitions
+  noremap <silent> <F3> :<C-u>call CocActionAsync('jumpDefinition')<CR>
+  command! -nargs=0 CocJumpDefinition :CocActionAsync('jumpDefinition')
+
+  " Map 'K' for showing documentation in preview window
+  " Use command ':verbose map K' to make sure it does not have conflict
+  " with other plugins (e.g. python-mode, jedi-vim)
+  nnoremap <silent> K :call <SID>show_documentation()<CR>
+  function! s:show_documentation()
+    if &filetype == 'vim'
+      execute 'h '.expand('<cword>')
+    else
+      call CocActionAsync('doHover')
+    endif
+  endfunction
+
+  " additional coc-featured commands
+  command! -nargs=0 CocExtensions :CocList extensions
+  command! -nargs=0 CocSnippets :CocList snippets
+
+endif
+
+
+" ---------------------------------------------------------------- }}}
 
 " }}}
 """""""""""""""""""""""""""""""""""""""""
 " Extra Settings {{{
 """""""""""""""""""""""""""""""""""""""""
+
+" Work around neovim 0.4.0+ bug
+" https://github.com/neovim/neovim/issues/9881
+" https://github.com/neoclide/coc.nvim/issues/668
+augroup secure_modeline_conflict_workaround
+  autocmd!
+  autocmd FileType help setlocal nomodeline
+augroup END
 
 " Use local vimrc if available
 if filereadable(expand("\~/.vimrc.local"))
