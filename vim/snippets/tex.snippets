@@ -1,3 +1,5 @@
+# seealso ~/.vim/UltiSnips/tex.snippets
+
 # Styles
 # ================================
 snippet bf
@@ -92,6 +94,10 @@ snippet item \begin{itemize} ... \end{itemize} block
 	\end{itemize}
 snippet paragraph
 	\paragraph{${1}} $0
+snippet minipage
+	\begin{minipage}[t]{\linewidth}
+	${0}
+	\end{minipage}
 #
 # Math Shortcuts
 # ==============
@@ -132,6 +138,8 @@ snippet tightlist Define \tightlist
 snippet xspace Import xspace package and configure it
 	\usepackage{xspace}
 	\xspaceaddexceptions{]\\}}
+snippet cleveref Import cleveref package
+	\usepackage[nameinlink]{cleveref}
 snippet deftodo
 	\newcommand{\\${1:todo}}[1]{\mbox{\color{red}{\small\bf\sf [${2:TODO: }#1]}}}
 snippet defabbr
@@ -170,11 +178,12 @@ snippet includegraphics
 	\includegraphics[width=\linewidth]{${1:filename.png}}
 #
 snippet figure
-	\begin{figure}[htb] \begin{center}
+	\begin{figure}[htb]
+	    \centering
 	    \includegraphics[width=\linewidth]{${1:filename.png}}
 	    \caption{${2:Caption here}}
 	    \label{fig:${3:figure1}}
-	\end{center} \end{figure}
+	\end{figure}
 #
 snippet subfigure
 	\begin{figure}[h!]

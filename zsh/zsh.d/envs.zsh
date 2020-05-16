@@ -7,11 +7,11 @@
 
 # fzf-powered CTRL-R: launch fzf with sort enabled
 # @see https://github.com/junegunn/fzf/issues/526
-export FZF_CTRL_R_OPTS='--sort'
+export FZF_CTRL_R_OPTS="--sort --prompt 'History> '"
 
 # Ctrl-T: Setting ripgrep or fd as the default source for Ctrl-T fzf
 if (( $+commands[rg] )); then
-    export FZF_CTRL_T_COMMAND='rg --files --hidden --follow --glob "!.git/"'
+    export FZF_CTRL_T_COMMAND='rg --files --hidden --follow --no-messages --glob "!.git/"'
 elif (( $+commands[fd] )); then
     export FZF_CTRL_T_COMMAND='fd --type f'
 fi
@@ -22,7 +22,12 @@ fi
 
 # ALT-C: FASD_CD with preview
 export FZF_ALT_C_COMMAND='fasd_cd -d -l -R'
-export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -200'"
+export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -200' --prompt 'cd> '"
+
+# Color and appearances for fzf
+# background color: use brighter and more visible color.
+# marker: use yellow-ish color to make it more appearant
+export FZF_DEFAULT_OPTS="--color 'bg+:239,marker:226'"
 
 # }}}
 
@@ -45,6 +50,14 @@ setopt NO_SHARE_HISTORY
 # See zsh-autoswitch-virtualenv #19
 unsetopt AUTO_NAME_DIRS       # Do not auto add variable-stored paths
 
+# If globs do not match a file, just run the command rather than throwing a no-matches error.
+# This is especially useful for some commands with '^', '~', '#', e.g. 'git show HEAD^1'
+unsetopt NOMATCH
+
+# Editor
+if (( $+commands[nvim] )) && [[ -z "$GIT_EDITOR" ]] ; then
+  export GIT_EDITOR="nvim"
+fi
 
 #
 # Path Configurations.

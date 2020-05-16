@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-print('''
+'''
    @wookayin's              ███████╗██╗██╗     ███████╗███████╗
    ██████╗  █████╗ ████████╗██╔════╝██║██║     ██╔════╝██╔════╝
    ██╔══██╗██╔══██╗╚══██╔══╝█████╗  ██║██║     █████╗  ███████╗
@@ -10,18 +10,18 @@ print('''
    ╚═════╝  ╚════╝    ╚═╝   ╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝
 
    https://dotfiles.wook.kr/
-''')
+'''
+print(__doc__)  # print logo.
+
 
 import argparse
-parser = argparse.ArgumentParser(description=__doc__)
+parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--force', action="store_true", default=False,
                     help='If set, it will override existing symbolic links')
 parser.add_argument('--skip-vimplug', action='store_true',
                     help='If set, do not update vim plugins.')
 parser.add_argument('--skip-zgen', '--skip-zplug', action='store_true',
                     help='If set, skip zgen updates.')
-parser.add_argument('--enable-coc', action='store_true',
-                    help='Install coc.nvim (highly experimental)')
 
 args = parser.parse_args()
 
@@ -68,8 +68,11 @@ tasks = {
     # GTK
     '~/.gtkrc-2.0' : 'gtkrc-2.0',
 
+    # kitty
+    '~/.config/kitty/kitty.conf': 'config/kitty/kitty.conf',
+
     # tmux
-    '~/.tmux'     : 'tmux',
+    '~/.tmux'      : 'tmux',
     '~/.tmux.conf' : 'tmux/tmux.conf',
 
     # .config (XDG-style)
@@ -87,28 +90,51 @@ tasks = {
 }
 
 
-from distutils.spawn import find_executable
+try:
+    from distutils.spawn import find_executable
+except ImportError:
+    # In some environments, distutils might not be available.
+    import sys
+    sys.stderr.write("WARNING: distutils not available\n")
+    find_executable = lambda _: False   # type: ignore
 
 
-post_actions = [
+post_actions = []
+post_actions += [
     '''#!/bin/bash
     # Check whether ~/.vim and ~/.zsh are well-configured
     for f in ~/.vim ~/.zsh ~/.vimrc ~/.zshrc; do
         if ! readlink $f >/dev/null; then
             echo -e "\033[0;31m\
 WARNING: $f is not a symbolic link to ~/.dotfiles.
-You may want to remove your local folder (~/.vim) and try again?\033[0m"
+Please remove your local folder/file $f and try again.\033[0m"
+            echo -n "(Press any key to continue) "; read user_confirm
             exit 1;
         else
             echo "$f --> $(readlink $f)"
         fi
     done
-    ''',
+''']
 
+post_actions += [
+    '''#!/bin/bash
+    # Download command line scripts
+    mkdir -p "$HOME/.local/bin/"
+    _download() {
+        curl -L "$2" > "$1" && chmod +x "$1"
+    }
+    ret=0
+    set -v
+    _download "$HOME/.local/bin/video2gif" "https://raw.githubusercontent.com/wookayin/video2gif/master/video2gif" || ret=1
+    exit $ret;
+''']
+
+post_actions += [
     '''#!/bin/bash
     # Update zgen modules and cache (the init file)
     zsh -c "
-        source ${HOME}/.zshrc                   # source zplug and list plugins
+        # source zplug and list plugins
+        DOTFILES_UPDATE=1 __p9k_instant_prompt_disabled=1 source ${HOME}/.zshrc
         if ! which zgen > /dev/null; then
             echo -e '\033[0;31m\
 ERROR: zgen not found. Double check the submodule exists, and you have a valid ~/.zshrc!\033[0m'
@@ -119,18 +145,26 @@ ERROR: zgen not found. Double check the submodule exists, and you have a valid ~
         zgen reset
         zgen update
     "
-    ''' if not args.skip_zgen else '',
+    ''' if not args.skip_zgen else \
+        '# zgen update (Skipped)'
+]
 
+post_actions += [
     '''#!/bin/bash
     # validate neovim package installation on python2/3 and automatically install if missing
-    source "etc/install-neovim-py.sh"
-    ''',
+    bash "etc/install-neovim-py.sh"
+''']
 
+vim = 'nvim' if find_executable('nvim') else 'vim'
+post_actions += [
     # Run vim-plug installation
-    {'install' : '{vim} +PlugInstall +qall'.format(vim='nvim' if find_executable('nvim') else 'vim'),
-     'update'  : '{vim} +PlugUpdate  +qall'.format(vim='nvim' if find_executable('nvim') else 'vim'),
-     'none'    : ''}['update' if not args.skip_vimplug else 'none'],
+    {'install' : '{vim} +PlugInstall +qall'.format(vim=vim),
+     'update'  : '{vim} +PlugUpdate  +qall'.format(vim=vim),
+     'none'    : '# {vim} +PlugUpdate (Skipped)'.format(vim=vim)
+     }['update' if not args.skip_vimplug else 'none']
+]
 
+post_actions += [
     # Install tmux plugins via tpm
     '~/.tmux/plugins/tpm/bin/install_plugins',
 
@@ -147,28 +181,40 @@ ERROR: zgen not found. Double check the submodule exists, and you have a valid ~
     else
         echo "$(which tmux): $(tmux -V)"
     fi
-    ''',
+''']
 
+post_actions += [
     r'''#!/bin/bash
-    # create directory ~/.config/coc if not exists
+    # Setting up for coc.nvim (~/.config/coc, node.js)
+
+    # (i) create ~/.config/coc directory if not exists
+    GREEN="\033[0;32m"; YELLOW="\033[0;33m"; RESET="\033[0m";
     coc_dir="$HOME/.config/coc/"
     if [ ! -d "$coc_dir" ]; then
         mkdir -p "$coc_dir" || exit 1;
         echo "Created: $coc_dir"
+    else
+        echo -e "${GREEN}coc directory:${RESET}   $coc_dir"
     fi
-    ''' if args.enable_coc else ''
 
+    # (ii) validate or auto-install node.js locally
+    bash "etc/install-node.sh" || exit 1;
+''']
+
+post_actions += [
     r'''#!/bin/bash
     # Change default shell to zsh
-    /bin/zsh --version >/dev/null || (echo -e "Error: /bin/zsh not found. Please install zsh"; exit 1)
+    /bin/zsh --version >/dev/null || (\
+        echo -e "\033[0;31mError: /bin/zsh not found. Please install zsh.\033[0m"; exit 1)
     if [[ ! "$SHELL" = *zsh ]]; then
         echo -e '\033[0;33mPlease type your password if you wish to change the default shell to ZSH\e[m'
         chsh -s /bin/zsh && echo -e 'Successfully changed the default shell, please re-login'
     else
         echo -e "\033[0;32m\$SHELL is already zsh.\033[0m $(zsh --version)"
     fi
-    ''',
+''']
 
+post_actions += [
     r'''#!/bin/bash
     # Create ~/.gitconfig.secret file and check user configuration
     if [ ! -f ~/.gitconfig.secret ]; then
@@ -198,10 +244,10 @@ EOL
     echo -en 'user.name  : '; git config --file ~/.gitconfig.secret user.name
     echo -en 'user.email : '; git config --file ~/.gitconfig.secret user.email
     echo -en '\033[0m';
-    ''',
-]
+''']
 
 ################# END OF FIXME #################
+
 
 def _wrap_colors(ansicode):
     return (lambda msg: ansicode + str(msg) + '\033[0m')
@@ -218,15 +264,15 @@ import os
 import sys
 import subprocess
 
-if sys.version_info[0] >= 3:  # python3
-    from builtins import input
-    unicode = lambda s, _: str(s)
-else:
-    input = raw_input         # python2
-
 from signal import signal, SIGPIPE, SIG_DFL
-from optparse import OptionParser
 from sys import stderr
+
+if sys.version_info[0] >= 3:  # python3
+    unicode = lambda s, _: str(s)
+    from builtins import input
+else:  # python2
+    input = sys.modules['__builtin__'].raw_input
+
 
 def log(msg, cr=True):
     stderr.write(msg)
@@ -246,6 +292,13 @@ def log_boxed(msg, color_fn=WHITE, use_bold=False, len_adjust=0):
                      "│" + pad_msg   + "│\n" +
                      "└" + ("─" * l) + "┘\n"), cr=False)
 
+def makedirs(target, mode=511, exist_ok=False):
+    try:
+        os.makedirs(target, mode=mode)
+    except OSError as ex:  # py2 has no exist_ok=True
+        import errno
+        if ex.errno == errno.EEXIST and exist_ok: pass
+        else: raise
 
 # get current directory (absolute path)
 current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -273,7 +326,7 @@ if submodule_issues:
         try:
             git_version = str(subprocess.check_output("""git --version | awk '{print $3}'""", shell=True))
             if git_version >= '2.8': git_submodule_update_cmd += ' --jobs 8'
-        except Exception as e:
+        except Exception as ex:
             pass
         log("Running: %s" % BLUE(git_submodule_update_cmd))
         subprocess.call(git_submodule_update_cmd, shell=True)
@@ -314,12 +367,9 @@ for target, source in sorted(tasks.items()):
 
     # make a symbolic link if available
     if not os.path.lexists(target):
-        try:
-            mkdir_target = os.path.split(target)[0]
-            os.makedirs(mkdir_target)
-            log(GREEN('Created directory : %s' % mkdir_target))
-        except:
-            pass
+        mkdir_target = os.path.split(target)[0]
+        makedirs(mkdir_target, exist_ok=True)
+        log(GREEN('Created directory : %s' % mkdir_target))
         os.symlink(source, target)
         log("{:50s} : {}".format(
             BLUE(target),
@@ -332,7 +382,8 @@ for action in post_actions:
         continue
 
     action_title = action.strip().split('\n')[0].strip()
-    if action_title == '#!/bin/bash': action_title = action.strip().split('\n')[1].strip()
+    if action_title == '#!/bin/bash':
+        action_title = action.strip().split('\n')[1].strip()
 
     log("\n", cr=False)
     log_boxed("Executing: " + action_title, color_fn=CYAN)
@@ -350,10 +401,12 @@ if errors:
         log("   " + YELLOW(e))
     log("\n")
 else:
-    log_boxed("✔︎  You are all set! ", len_adjust=-1,
+    log_boxed("✔  You are all set! ",
               color_fn=GREEN, use_bold=True)
 
 log("- Please restart shell (e.g. " + CYAN("`exec zsh`") + ") if necessary.")
 log("- To install some packages locally (e.g. neovim, tmux), try " + CYAN("`dotfiles install <package>`"))
 log("- If you want to update dotfiles (or have any errors), try " + CYAN("`dotfiles update`"))
 log("\n\n", cr=False)
+
+sys.exit(len(errors))

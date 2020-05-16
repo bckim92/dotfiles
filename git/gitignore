@@ -4,6 +4,7 @@
 .*.s[a-w][a-z]
 Session.vim
 .netrwhist
+.XTabline*
 
 # Mac OS X
 .DS_Store
@@ -19,12 +20,15 @@ Session.vim
 Thumbs.db
 
 # IDE stuffs
+.vscode/
 .idea/
 *.iml
 .project
 .classpath
 .settings/
 .ipynb_checkpoints/
+tags
+.vimspector.json
 
 # Python, Virtualenv, Condaenv
 .venv*
@@ -32,6 +36,10 @@ Thumbs.db
 __pycache__
 *.py[cod]
 .cenv*
+.condaenv
 
 # Etc
 npm-debug.log
+
+# Log files
+events.out.tfevents.*

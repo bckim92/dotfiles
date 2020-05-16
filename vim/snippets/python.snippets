@@ -1,3 +1,6 @@
+# This is LEGACY snipmate snippets.
+# seealso ~/.vim/UltiSnips/python.snippets
+
 snippet utf8
 	# -*- coding: utf-8 -*-
 
@@ -10,6 +13,13 @@ snippet future
 	from __future__ import division
 	from __future__ import print_function
 
+snippet rich
+	from rich.console import Console
+	console = Console(markup=False)
+	print = Console.print
+snippet rich.traceback
+	import rich.traceback; rich.traceback.install(width=None)
+
 snippet print
 	print(${1})
 #
@@ -21,12 +31,6 @@ snippet freopen
 	#sys.stdin = file('${1:input.txt}', 'r')
 	#sys.stdout = file('${2:output.txt}', 'w')
 	rl = sys.stdin.readline
-
-snippet testcase
-	import unittest
-	class Test${1:Example}(unittest.TestCase):
-	    def test_hello(self):
-	        self.assertFalse("Implement me!")
 
 snippet class
 	class ${1:ClassName}(${2:object}):
@@ -45,30 +49,32 @@ snippet init
 	def __init__(self):
 	    ${1:pass}
 #
+snippet self._
+	self._$1 = ${1}
+snippet @property
+	@property
+	def ${1}(self):
+		return self._$1
+#
 snippet repr
 	def __repr__(self):
 	    return ${1:str(self)}
 #
 snippet embed
-	from IPython import embed; embed()  # XXX DEBUG
-
+	from IPython import embed; embed(colors="neutral")  # XXX DEBUG
+#
 snippet embedsys
-	from IPython import embed; embed()  # XXX DEBUG
+	from IPython import embed; embed(colors="neutral")  # XXX DEBUG
 	import sys; sys.exit()
-
+#
 snippet pdb
 	import pdb; pdb.set_trace()  # XXX DEBUG
-
+#
 snippet ipdb
 	import ipdb; ipdb.set_trace()  # XXX DEBUG
-
+#
 snippet pudb
 	import pudb; pudb.set_trace()  # XXX DEBUG
-
-snippet pylint
-	# pylint: disable=${1}
-	${0}
-	# pylint: enable=$1
 #
 snippet argparse
 	import argparse
@@ -89,6 +95,18 @@ snippet main
 snippet PATH
 	__PATH__ = os.path.abspath(os.path.dirname(__file__))
 #
+snippet loguru
+	from loguru import logger
+snippet loguru.configure
+	logger.configure(handlers=[])
+	LOG_FORMAT = (   # see loguru._defaults.LOG_FORMAT
+	  "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+	  "<level>{level: <8}</level> | "
+	  #"<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+	  "<level>{message}</level>"
+	)
+	logger.add(sink=sys.stdout, format=LOG_FORMAT)
+
 snippet logging
 	import logging
 	formatter = logging.Formatter('[%(levelname)s %(asctime)s] %(message)s')   # colorlog?
@@ -150,8 +168,15 @@ snippet OrderedDict
 snippet namedtuple
 	from collections import namedtuple
 #
-snippet tf
-	import tensorflow as tf
+# matplotlib
+snippet mpl_colorbar
+	from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+	from mpl_toolkits.axes_grid1.colorbar import colorbar
+	cax = make_axes_locatable(${1:ax}).append_axes("right", size="5%", pad=0.05)
+	colorbar(${2:im}, cax=cax)
+#
+# tensorflow
+# see also: ~/.vim/UltiSnips/python_tensorflow.snippets
 snippet tflayers
 	import tensorflow.contrib.layers as layers
 snippet tfslim

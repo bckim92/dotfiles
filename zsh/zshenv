@@ -33,6 +33,11 @@ if [[ -z "$LANG" ]]; then
   export LANG='en_US.UTF-8'
 fi
 
+# Fix broken, wrong LC variables (e.g. kitty)
+if [[ "$LC_CTYPE" == "UTF-8" ]]; then
+  export LC_CTYPE='en_US.UTF-8'
+fi
+
 #
 # Paths
 #
@@ -63,16 +68,29 @@ if [ -d $HOME/.dotfiles/bin/ ]; then
   path=( $path $HOME/.dotfiles/bin )
 fi
 
-# Anaconda3
-if [ -d $HOME/.anaconda3/bin/ ]; then
-  path=( $path $HOME/.anaconda3/bin )
-fi
+# Cleanup some anaconda environment variables to avoid messing up in tmux, etc.
+# (these environment variables might be copied and inherited unwantedly)
+unset CONDA_EXE
+unset CONDA_PREFIX
+unset CONDA_DEFAULT_ENV
+unset CONDA_PYTHON_EXE
+unset CONDA_SHLVL
 
 # Miniconda3
-if [ -d $HOME/.miniconda3/bin/ ]; then
-  path=( $path $HOME/.miniconda3/bin )
+if [ -d "$HOME/.miniconda3/bin/" ]; then
+  path=( $path "$HOME/.miniconda3/bin" )
+  export CONDA_EXE="$HOME/.miniconda3/bin/conda"
 elif [ -d "/usr/local/miniconda3/" ]; then
   path=( $path "/usr/local/miniconda3/bin" )
+  export CONDA_EXE="/usr/local/miniconda3/bin/conda"
+fi
+
+# Anaconda3 (deprecated, should prefer miniconda3)
+if [ -d $HOME/.anaconda3/bin/ ]; then
+  path=( $path $HOME/.anaconda3/bin )
+  if [[ "$CONDA_EXE" != *"miniconda"* ]]; then
+    export CONDA_EXE=$HOME/.anaconda3/bin/conda
+  fi
 fi
 
 # rust (cargo)
@@ -131,7 +149,8 @@ export WORKON_HOME="$HOME/.virtualenvs"
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # ensure that all new virtual environments are isolated from the system site-packages.
-export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
+# (--no-site-packages has been removed since virtualenv >= 20, which has been the default option)
+# export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
 
 # python startup
 export PYTHONSTARTUP=$HOME/.pythonrc.py
@@ -149,3 +168,7 @@ if [ -d $HOME/.miniconda3/bin/ ]; then
   . $HOME/.miniconda3/etc/profile.d/conda.sh
 fi
 # }}}
+
+if [ -f "$HOME/.zshenv.local" ]; then
+  source "$HOME/.zshenv.local"
+fi

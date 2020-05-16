@@ -1,12 +1,67 @@
 # Advanced TeX snippets powered by ultisnip
 # vim: set expandtab:
 
+# seealso :help snippet-options
+# seealso ~/.vim/snippets/tex.snippets
+
 global !p
 def slugify(text):
     import unidecode, re
     text = unidecode.unidecode(text).lower()
     return re.sub(r'[\W_]+', '-', text)
+
+def get_matching_pair(query):
+    pairs = ['()', '{}', '<>', '[]' ]
+    d = dict(sum([[(l, r), (r, l)] for (l, r) in pairs], []))
+    # find a matching pair based on the first character.
+    return d.get(query[0], "") if query else ""
 endglobal
+
+
+# Borrowed from:
+# https://vi.stackexchange.com/questions/18490/ultisnips-context-and-tex
+# https://castel.dev/post/lecture-notes-1/
+global !p
+texMathZones = ['texMathZone{}'.format(x) for x in (
+    'A', 'AS', 'B', 'BS', 'C', 'CS', 'D', 'DS', 'E', 'ES', 'F', 'FS', 'G', 'GS',
+    'H', 'HS', 'I', 'IS', 'J', 'JS', 'K', 'KS', 'L', 'LS', 'DS', 'V', 'W', 'X', 'Y', 'Z', )]
+texMathZones += ['texMathZoneAms{}'.format(x) for x in (    # amsmath package
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'AS', 'BS', 'CS', 'DS', 'ES', 'FS', 'GS', )]
+texMathZones += ['texMathZoneBreqn{}'.format(x) for x in (  # breqn package
+    'A', 'B', 'C', 'D', 'AS', 'BS', 'CS', 'DS', )]
+texIgnoreMathZones = ['texMathText']
+
+texMathZoneIds = vim.eval('map(' + str(texMathZones) + ", 'hlID(v:val)')")
+texIgnoreMathZoneIds = vim.eval('map(' + str(texIgnoreMathZones) + ", 'hlID(v:val)')")
+ignore = texIgnoreMathZoneIds[0]
+
+def is_math():
+    synstackids = vim.eval("synstack(line('.'), col('.') - (col('.')>=2 ? 1 : 0))")
+    try:
+        first = next(i for i in reversed(synstackids) if i in texIgnoreMathZoneIds or i in texMathZoneIds)
+        return first != ignore
+    except StopIteration:
+        return False
+
+def detect_root_texfile():
+    from glob import glob
+    import os.path
+    for f in glob(os.path.join(vim.eval("getcwd()"), "*.tex")):
+        with open(f, "r") as fp:
+            for nr, line in enumerate(fp):
+                if nr > 50: break   # do not read too many lines
+                if '!TEX ROOT =' in line: continue
+                if line.startswith(r'\documentclass{'):
+                    return os.path.basename(f)
+    return "UNKNOWN_ROOT_DOCUMENT.tex"  # Not found
+endglobal
+
+# Preamble
+# ===================
+
+snippet "% !TEX root" "Inserts `% !TEX root = ...` directive"
+%!TEX root = `!p snip.rv = detect_root_texfile()`
+endsnippet
 
 # Common environments
 # ===================
@@ -24,4 +79,59 @@ snippet "\\?subsec(tion)?" "\subsection{}" rb
 \subsection{$1}
 \label{sec:`!p snip.rv = slugify(t[1])`}
 $0
+endsnippet
+
+snippet "\\?para(graph)?" "\paragraph{}" r
+\paragraph{${1}} $0
+endsnippet
+
+snippet "\\?left" "\left..\right" r
+\left${1:}\right`!p snip.rv = get_matching_pair(t[1])`
+endsnippet
+
+context "is_math()"
+snippet cal "\mathcal" wA
+\mathcal{$1}$0
+endsnippet
+context "is_math()"
+snippet bf "\mathbf" wA
+\mathbf{$1}$0
+endsnippet
+context "is_math()"
+snippet bb "\mathbb" wA
+\mathbb{$1}$0
+endsnippet
+
+context "is_math()"
+snippet -> "\rightarrow" wA
+\rightarrow
+endsnippet
+context "is_math()"
+snippet <- "\leftarrow" wA
+\leftarrow
+endsnippet
+context "is_math()"
+snippet => "\Rightarrow" wA
+\Rightarrow
+endsnippet
+context "is_math()"
+snippet <= "\Leftarrow" wA
+\Leftarrow
+endsnippet
+context "is_math()"
+snippet ==> "\Longrightarrow" wA
+\Longrightarrow
+endsnippet
+context "is_math()"
+snippet <== "\Longleftarrow" wA
+\Longleftarrow
+endsnippet
+
+context "is_math()"
+snippet _t+1 "_{t+1}" iA
+_{t+1}
+endsnippet
+context "is_math()"
+snippet _t-1 "_{t-1}" iA
+_{t-1}
 endsnippet

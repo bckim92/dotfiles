@@ -48,8 +48,12 @@ def add_argument(*args, **kwargs):
 
 ###############################################################################################
 
-@add_argument('--skip-zplug', action='store_true', help='Skip zplug update')
-def update(skip_zplug=False):
+@add_argument('--fast', action='store_true', help='Skip all slow updates (zgen, vimplug)')
+@add_argument('--skip-zplug', action='store_true', help='Skip zplug/zgen update')
+@add_argument('--skip-vimplug', action='store_true', help='Skip vim-plug update')
+def update(fast=False,
+           skip_zplug=False,
+           skip_vimplug=False):
     '''Update the dotfiles from github.'''
 
     dotfiles_dir = os.path.expanduser('~/.dotfiles')
@@ -63,15 +67,19 @@ def update(skip_zplug=False):
 
     git_old_head = _git_head()
 
-    install_args = ""
-    if skip_zplug: install_args += "--skip-zplug "
+    install_args = set()
+    if skip_zplug: install_args.add("--skip-zplug")
+    if skip_vimplug: install_args.add("--skip-vimplug")
+    if fast: install_args.update(["--skip-zplug", "--skip-vimplug"])
+    install_args = ' '.join(install_args)
 
     # TODO: check if current branch is master
     action = '''
         set -x
         cd ~/.dotfiles
+        git fetch origin
         git stash
-        git pull --ff-only && python install.py {install_args}
+        git merge --ff-only && python install.py {install_args}
         git stash pop
     '''.format(install_args=install_args)
     subprocess.call(['bash', '-c', action])
@@ -95,16 +103,19 @@ def open_github():
     webbrowser.open("https://dotfiles.wook.kr", new=0)
 
 
-@add_argument('target', nargs='+', help='target package to install, see ~/.dotfiles/etc/linux-locals.sh for list')
+@add_argument('target', nargs='*', help='target package to install, see ~/.dotfiles/etc/linux-locals.sh for list')
 @add_argument('--force', action='store_true')
-def install_local(target, force):
+def install_local(target, force, argv=[]):
     '''
     Install local packages as specified in /etc/linux-locals.sh.
     Available only in Linux.
     '''
 
     if platform.system() != 'Linux':
-        print("Error: only available on linux systems")
+        print("Error: only available on linux systems.")
+        if platform.system() == 'Darwin':
+            print("On macOS, try " + YELLOW("brew install <package>")
+                  + " instead (https://brew.sh/)")
         sys.exit(1)
 
     if not isinstance(target, (list, tuple)):
@@ -112,10 +123,22 @@ def install_local(target, force):
 
     dotfiles_dir = os.path.expanduser('~/.dotfiles')
 
+    if not target:
+        ret = subprocess.check_output('./etc/linux-locals.sh || true',
+                                      shell=True, cwd=dotfiles_dir)
+        if not isinstance(ret, str): ret = ret.decode()
+        print("Available packages:")
+        packages = [l[8:] for l in ret.split() if l.startswith('install_')]
+        print('\n'.join(['- {l}'.format(l=l) for l in packages]))
+        return 1
+
     for t in target:
         ret = subprocess.call(
-            './etc/linux-locals.sh install_{} {}'.format(
-                t, '--force' if force else ''),
+            './etc/linux-locals.sh install_{target} {force_flag} {flag}'.format(
+                target=t,
+                force_flag='--force' if force else '',
+                flag=' '.join(argv)   # TODO: shlex (python 3+)
+            ),
             shell=True, cwd=dotfiles_dir
         )
 
@@ -134,6 +157,8 @@ def main():
         'github': open_github,
         'install' : install_local,
     }
+    for fn in COMMANDS.values():
+        fn.__doc__ = fn.__doc__.strip()
 
     from argparse import ArgumentParser, RawTextHelpFormatter
     parser = ArgumentParser(description=__doc__,
@@ -150,10 +175,12 @@ def main():
         parser.print_help()
         sys.exit(1)
     else:
-        args = parser.parse_args()
+        args, unknown = parser.parse_known_args()
 
     kwargs = vars(args)
     command = kwargs.pop('command')
+    if unknown:
+        kwargs['argv'] = unknown
     ret = COMMANDS[command](**kwargs)
 
     if ret:  # non-zero exit code
