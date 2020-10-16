@@ -180,6 +180,7 @@ set completeopt=menuone,preview,longest     " show preview and pop-up menu
 " no fucking swap and backup files
 set noswapfile
 set nobackup
+set autoread
 
 " dictionary
 if filereadable('/usr/share/dict/words')
@@ -902,6 +903,16 @@ function! ShowSyntaxGroup()
 endfunction
 
 noremap <leader>syn :call ShowSyntaxGroup()<cr>
+
+" Solves the yaml comment autoindent conundrum.
+" https://unix.stackexchange.com/a/106538/192990
+set nosmartindent
+set cindent
+filetype plugin indent on
+set cinkeys-=0#
+set indentkeys-=0#
+autocmd FileType * set cindent "some file types override it
+autocmd FileType * set indentkeys-=0# "some file types override it
 
 " }}}
 """""""""""""""""""""""""""""""""""""""""
