@@ -252,6 +252,9 @@ function! ToggleVerbose()
   endif
 endfunction
 
+" For tex spell check
+autocmd FileType tex,markdown setlocal spell
+
 " }}}
 """""""""""""""""""""""""""""""""""""""""
 " 2. Key and Functional Mappings {{{
