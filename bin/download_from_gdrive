@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+import requests
+
+
+def _get_confirm_token(response):
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+    return None
+
+
+def download_from_google_drive(gd_id, destination):
+    """Use the requests package to download a file from Google Drive."""
+    URL = 'https://docs.google.com/uc?export=download'
+
+    with requests.Session() as session:
+        response = session.get(URL, params={'id': gd_id}, stream=True)
+        token = _get_confirm_token(response)
+
+        if token:
+            response.close()
+            params = {'id': gd_id, 'confirm': token}
+            response = session.get(URL, params=params, stream=True)
+
+        CHUNK_SIZE = 32768
+        with open(destination, 'wb') as f:
+            for chunk in response.iter_content(CHUNK_SIZE):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+        response.close()
+
+
+def main(gd_id, dest):
+    print("Download {dest} from gd_id {gd_id}".format(dest=dest, gd_id=gd_id))
+    download_from_google_drive(gd_id, dest)
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--gd_id', type=str, required=True)
+    parser.add_argument('--dest', type=str, required=True)
+    args = parser.parse_args()
+
+    main(**vars(args))
