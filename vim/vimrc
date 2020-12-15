@@ -2230,6 +2230,7 @@ let g:git_messenger_include_diff = 'current'
 " ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{
 let g:gundo_right = 1   " show at right
+let g:gundo_prefer_python3  = 1
 nnoremap <leader>G :GundoToggle<CR>
 
 " ---------------------------------------------------------------- }}}
