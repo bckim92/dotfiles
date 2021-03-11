@@ -2121,6 +2121,7 @@ let g:LatexBox_Folding = 1
 let g:vimtex_disable_version_warning = 1
 
 let g:vimtex_mappings_enabled = 1
+let g:vimtex_latexmk_build_dir = 'target'
 
 " Disable callback feature if vim lacks feature +clientserver
 if ! (has('clientserver') || has('nvim'))
