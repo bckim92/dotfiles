@@ -19,10 +19,10 @@ if filereadable(expand('~/.vim/plugins.vim'))
 endif
 
 " Automatically install missing plugins on startup
-autocmd VimEnter *
-  \  if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
-  \|   PlugInstall --sync | q
-  \| endif
+if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
+  let g:plugs_missing = 1
+  autocmd VimEnter * PlugInstall --sync | q
+endif
 
 
 " }}}
@@ -50,8 +50,9 @@ endif
 " use path '~/.vim' even on non-unix machine
 set runtimepath+=~/.vim
 
-" add ~/.local/bin to $PATH
+" add ~/.local/bin and ~/.dotfiles/bin to $PATH
 let $PATH .= ':' . expand('~/.local/bin')
+let $PATH .= ':' . expand('~/.dotfiles/bin')
 
 " load plugins with pathogen
 try
@@ -176,6 +177,8 @@ set splitbelow                              " :split  opens window below (:below
 set splitright                              " :vsplit opens window right (:belowright vsplit)
 set completeopt=menuone,preview,longest     " show preview and pop-up menu
 
+" Avoid 'Pattern not found' messages (nvim-compe, etc.)
+set shortmess+=c
 
 " no fucking swap and backup files
 set noswapfile
@@ -209,7 +212,7 @@ set switchbuf+=usetab,split
 if &diff
   set diffopt+=iwhite
   " use more intuitive, semantically easy-to-parse diff algorithm
-  if has("patch-8.1.0360")
+  if has("patch-8.1.0360") || has('nvim')
     set diffopt+=internal,algorithm:patience
   endif
 endif
@@ -366,6 +369,10 @@ if has('nvim')
   tmap <silent> <C-k> <C-\><C-n>:wincmd k<CR>
   "tmap <C-l> <C-\><C-n><C-l>
   " TODO: <c-l> is for clear screen...?
+
+  " Ctrl-E, Ctrl-Y: Scroll window in terminal-normal mode
+  tmap <silent> <C-e> <C-\><C-n><C-e>
+  tmap <silent> <C-y> <C-\><C-n><C-y>
 endif
 
 if has('nvim')
@@ -554,13 +561,13 @@ function! DetermineProjectRoot() abort
   " If the current file is under a git repository, that's it!
   let l:git_dir = s:get_git_dir()
   if !empty(l:git_dir)
-    return l:git_dir . "/.."
+    return resolve(l:git_dir . "/..")
   endif
 
   " Not a git repository. Use heuristic and domain knowledge as much as you can
   let l:base_dir = expand("%:p")
   if l:base_dir =~ 'python[^/]*/site-packages/[^/]\+/'
-    return substitute(l:base_dir, '\(python[^/]*/site-packages/[^/]\+/\).*$', '\1', 'g')
+    return resolve(substitute(l:base_dir, '\(python[^/]*/site-packages/[^/]\+/\).*$', '\1', 'g'))
   endif
 
   echohl WarningMsg | echom 'Cannot determine project root directory. (Want :CD?)' | echohl None
@@ -587,8 +594,12 @@ function! s:open_vimrc_tab()
   let l:addon_height = max([2, float2nr(0.2 * &lines)])
 
   exec ":tabnew " . resolve(expand("~/.vim/vimrc"))
+  if filereadable(expand("~/.config/nvim/lua/config/lsp.lua"))
+    exec ":vsplit " . resolve(expand("~/.config/nvim/lua/config/lsp.lua"))
+    exec printf(":vertical resize %d", 2 * l:plug_width)
+  endif
   if filereadable(expand("~/.vimrc.local"))
-    exec ":belowright sp " . resolve(expand("~/.vimrc.local"))
+    exec ":botright sp " . resolve(expand("~/.vimrc.local"))
     exec printf(":resize %d", l:addon_height)
   endif
 
@@ -885,9 +896,9 @@ match ExtraWhitespace /\s\+$/
 augroup trailing_whitespaces
   autocmd!
   autocmd FileType GV,gitmessengerpopup,fugitive highlight clear ExtraWhitespace
-  autocmd BufWinEnter * match ExtraWhitespace /\s\+$/
-  autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
-  autocmd InsertLeave * match ExtraWhitespace /\s\+$/
+  autocmd BufWinEnter * if &filetype != '' | match ExtraWhitespace /\s\+$/ | endif
+  autocmd InsertEnter * if &filetype != '' | match ExtraWhitespace /\s\+\%#\@<!$/ | endif
+  autocmd InsertLeave * if &filetype != '' | match ExtraWhitespace /\s\+$/ | endif
   autocmd BufWinLeave * call clearmatches()
 augroup END
 
@@ -905,6 +916,11 @@ if hlexists('NormalFloat')
   highlight NormalFloat     ctermbg=233 guibg=#121212
 endif
 
+" Use different popupmenu highlight color for nvim-lsp
+if g:dotfiles_completion_backend == '@lsp'
+  " oc-yellow-1
+  hi Pmenu guibg=#fff3bf
+endif
 
 " http://vim.wikia.com/wiki/Identify_the_syntax_highlighting_group_used_at_the_cursor
 function! ShowSyntaxGroup()
@@ -1152,13 +1168,21 @@ function! AirlineSectionInit()
         \ '%<', 'file', g:airline_symbols.space, 'readonly',
         \ ])
 
-  " section y: +coc_status, -filetype
-  " Customize how coc_status should work (after airline#extensions#coc#init is called)
+  " LSP or coc.nvim support (this should run after airline#extensions#coc#init is called)
   if exists(':CocCommand') | call airline#parts#define_function('coc_status', 'AirlineCocStatusSimple') | endif
+  if exists(':LspStatus')  | call airline#parts#define_function('lsp_status', 'AirlineLspStatus') | endif
+
+  " section y: +coc_status, -filetype
   let g:airline_section_x = airline#section#create_right([
-        \ 'coc_status',
+        \ 'coc_status', 'lsp_status',
         \ 'bookmark', 'tagbar', 'vista', 'gutentags', 'grepper',
         \ ])               " excludes filetype
+
+endfunction
+
+" airline + lsp-status
+function! AirlineLspStatus() abort
+  return v:lua.LspStatus()
 endfunction
 
 " airline-coc customization
@@ -1666,6 +1690,8 @@ endif
 " vim-clap {{{
 if has_key(g:plugs, 'vim-clap')
 
+let g:clap_layout = { 'relative': 'editor' }
+
 " better background color for clap dialogs
 hi ClapDisplay   ctermbg=236 guibg=#292c3a
 hi ClapMatches   cterm=bold ctermfg=170 gui=bold guifg=#bc6ec5
@@ -1683,6 +1709,7 @@ let g:floaterm_background = '#1a2a31'
 hi Floaterm         guibg=#1a2a31
 hi FloatermBorder   guibg=#1a2a31 guifg=white
 hi def link FloatermNF        Floaterm
+hi def link FloatermNC        Floaterm
 hi def link FloatermBorderNF  FloatermBorder
 
 command! -bang -nargs=? -complete=shellcmd  T                    :FloatermToggleOrNew<bang> <args>
@@ -1722,20 +1749,41 @@ endfunction
 let g:floaterm_width = 0.9
 let g:floaterm_height = 0.7
 
+" Turn off auto-hiding of previous floaterm windows,
+" in favor of the autohide autocmd below (only works for 'floating' windows)
+let g:floaterm_autohide = 0
+
 augroup FloatermCustom
   autocmd!
-  " when leaving out from floaterm, hide it so that it doesn't cover other windows
-  autocmd BufLeave floaterm://*,term://*   call <SID>autohide_floaterm()
-  autocmd FileType floaterm tmap <buffer> <silent> <C-z>
-        \ <C-\><C-n>:wincmd p<CR>
+  autocmd user FloatermOpen   call s:floaterm_configure_after()
 augroup END
+function! s:floaterm_configure_after()
+  " Automatically hide floaterm when leaving the buffer:
+  " When leaving out of floaterm, hide it so that it doesn't cover other windows
+  " This autocmd should be set after 'opening' floaterm is complete (i.e., autocmd FloatermOpen),
+  " because BufLeave can be triggered before that (e.g., while creating border windows).
+  augroup FloatermAutoHide
+    autocmd!
+    autocmd BufLeave <buffer> call <SID>autohide_floaterm()
+  augroup end
+  " Use <C-z> to auto-hide the current floaterm window and move back to the previous window
+  tnoremap <buffer> <silent> <C-z>    <C-\><C-n>:wincmd p<CR>
+endfunction
 function! s:floaterm_hide(bufnr)
   "return floaterm#window#hide_floaterm(a:bufnr)   " API removed (d7196ee0)
   execute a:bufnr . 'FloatermHide'
 endfunction
 function! s:autohide_floaterm() abort
+  " Ensure this BufLeave event handler gets executed only once
+  autocmd! FloatermAutoHide
   if &filetype == 'floaterm'
-    if get(get(b:, 'floaterm_opts', {}), 'wintype') == 'floating'  " (e29e93b2)
+    " Damn, floaterm keeps changing and breaking things ...
+    " e29e93b2 (2020/8/31): floaterm_winopts -> floaterm_opts
+    " 2b241d7e (2021/1/3):  floaterm_opts -> floaterm_config
+    " 392f3b65 (2021/1/10): No more dict, b:floaterm_wintype, etc. (why such changes?)
+    let l:floaterm_wintype = get(get(b:, 'floaterm_config', get(b:, 'floaterm_opts', {})), 'wintype')
+    if empty(l:floaterm_wintype) | let l:floaterm_wintype = get(b:, 'floaterm_wintype') | endif
+    if l:floaterm_wintype == 'float' || l:floaterm_wintype == 'floating'
       let l:FuncHide = function('s:floaterm_hide', [bufnr('%')])   " neovim or 7.4.1836+
       call timer_start(0, { -> l:FuncHide() })
     endif
@@ -1757,6 +1805,50 @@ let g:quickui_preview_h = 25
 let g:quickui_color_scheme = 'papercol light'
 hi QuickPreview guibg=#262d2d
 
+
+" ---------------------------------------------------------------- }}}
+" vim-xtabline {{{
+
+let g:xtabline_settings = {}
+
+" Use tabs mode if there are 2+ tabs, or buffers mode if there is only one
+if has("patch-7.4.1658") && has_key(g:plugs, 'vim-xtabline')
+  augroup TablineHybridMode
+    autocmd!
+    autocmd TabNew,TabClosed * call s:tabline_automode()
+  augroup end
+  function! s:tabline_automode(...) abort
+    if !v:vim_did_enter | return | endif
+    if tabpagenr('$') >= 2
+      silent XTabMode tabs
+    else
+      silent XTabMode buffers
+    endif
+  endfunction
+
+  " Use 'buffers' as the default xtabline mode (when there is only one tab)
+  let g:xtabline_settings.tabline_modes = ['buffers', 'tabs', 'arglist']
+endif
+
+
+" ---------------------------------------------------------------- }}}
+" wilder.nvim - Better wildmenu {{{
+" https://github.com/gelguy/wilder.nvim#example-configs
+
+if has_key(g:plugs, 'wilder.nvim')
+  call wilder#enable_cmdline_enter()
+  set wildcharm=<Tab>
+  cmap <expr> <Tab>   wilder#in_context() ? wilder#next()     : "\<Tab>"
+  cmap <expr> <S-Tab> wilder#in_context() ? wilder#previous() : "\<S-Tab>"
+
+  " only / and ? are enabled by default
+  call wilder#set_option('modes', ['/', '?', ':'])
+
+  " use popupmenu
+  call wilder#set_option('renderer', wilder#popupmenu_renderer({
+        \ 'highlighter': wilder#basic_highlighter(),
+        \ }))
+endif
 
 " ---------------------------------------------------------------- }}}
 " Dash {{{
@@ -1789,16 +1881,55 @@ let g:NERDTreeChDirMode = 1
 " <Leader>N toggles NERDTree (across tab)
 map <Leader>N <plug>NERDTreeTabsToggle<CR>
 
+" By default nerdtree maps <C-j> and <C-k> which I want to reserve for window
+" navigation instead for the sake consistency. Therefore use different keymaps.
+let g:NERDTreeMapJumpNextSibling = '<leader><C-j>'
+let g:NERDTreeMapJumpPrevSibling = '<leader><C-k>'
+
 " Startup Options (do NOT show automatically)
 let g:nerdtree_tabs_open_on_console_startup = 0
 let g:nerdtree_tabs_open_on_gui_startup = 0
 
 " filter out some files, by extension
 let NERDTreeIgnore = [
-      \ '\.pyc$', '^__pycache__$', '\.egg-info$',
+      \ '\.git$', '^__node_modules__$',
+      \ '\.pyc$', '^__pycache__$', '^.pytest_cache$', '.mypy_cache', '\.egg-info$',
       \ '\.class$', '\.o$',
       \]
 let NERDTreeRespectWildIgnore = 1   " see wildignore
+
+" ---------------------------------------------------------------- }}}
+" nvim-tree.lua {{{
+
+if has_key(g:plugs, 'nvim-tree.lua')
+  nmap <leader>E  :NvimTreeToggle<CR>
+
+  " Ignore some files
+  let g:nvim_tree_ignore = ['.git', '__node_modules__',
+        \ '__pycache__', '.pytest_cache', '.mypy_cache', '.cache',
+        \ ]
+  let g:nvim_tree_gitignore = 1
+  " Update the location cursor whenever entering a buffer
+  let g:nvim_tree_follow = 1
+  " Use trailing '/' for folders
+  let g:nvim_tree_add_trailing = 1
+  " Show indent markers (vertical segments)
+  let g:nvim_tree_indent_markers = 1
+  " Don't ask which window should be picked to open files.
+  let g:nvim_tree_disable_window_picker = 1
+
+  " keymappings
+lua<<EOF
+  lua_ready, _ = pcall(require, 'nvim-tree.config')
+  if lua_ready then   -- TODO: Make it lazyily sourced
+    local tree_cb = require'nvim-tree.config'.nvim_tree_callback
+    vim.g.nvim_tree_bindings = {
+      { key = "?",                            cb = tree_cb("toggle_help") },
+      { key = "r",                            cb = tree_cb("refresh") },
+    }
+  end
+EOF
+endif
 
 " ---------------------------------------------------------------- }}}
 " Voom {{{
@@ -1840,17 +1971,44 @@ xmap ga <Plug>(EasyAlign)
 nmap ga <Plug>(EasyAlign)
 
 " ---------------------------------------------------------------- }}}
+" indent-blankline.nvim {{{
+" :help indent-blankline
+
+if has_key(g:plugs, 'indent-blankline.nvim')
+  let g:indent_blankline_char = '┊'
+  let g:indent_blankline_filetype_exclude = ['help', 'NvimTree', 'pandoc']
+  let g:indent_blankline_buftype_exclude = ['terminal']
+  let g:indent_blankline_show_first_indent_level = v:false
+
+  highlight IndentBlanklineChar guifg=#444444 gui=nocombine
+endif
+
+" ---------------------------------------------------------------- }}}
 " indentLine {{{
+"
+if has_key(g:plugs, 'indentLine')
 
-" conceal might break latex/json/markdown syntax, etc.
-" see also after/ftplugin/*.vim settings for conceal level configuration.
-let g:indentLine_conceallevel = 1
+  " conceal might break latex/json/markdown syntax, etc.
+  " see also after/ftplugin/*.vim settings for conceal level configuration.
+  let g:indentLine_conceallevel = 1
 
-" conceal values might not work well for tex files (hides some characters)
-let g:indentLine_fileTypeExclude = ['tex', 'markdown', 'pandoc', 'coc-explorer', 'floaterm', 'tagbar']
+  " conceal values might not work well for tex files (hides some characters)
+  let g:indentLine_fileTypeExclude = ['tex', 'markdown', 'pandoc', 'NvimTree', 'coc-explorer', 'floaterm', 'tagbar']
 
-" command alias
-command! -nargs=0 ToggleIndentLines   :IndentLinesToggle
+  " command alias
+  command! -nargs=0 ToggleIndentLines   :IndentLinesToggle
+
+endif
+
+" ---------------------------------------------------------------- }}}
+" nvim-scrollview {{{
+
+" Make the scrollbar aware of foldings (see #11).
+let g:scrollview_mode = 'virtual'
+
+" Disable scrollbar on some filetypes                                                                          │
+" (to avoid which can cause floating-window related errors)                                                    │
+let g:scrollview_excluded_filetypes = ['vim-plug', 'GV', 'git']
 
 " ---------------------------------------------------------------- }}}
 " UltiSnips {{{
@@ -2023,10 +2181,15 @@ if has_key(g:plugs, 'coc.nvim')
     let g:pymode_doc_bind = '<leader>PK'
 endif
 
+" Hanging indent of 4 spaces, in which case there should be nothing after
+" the open parenthesis or bracket on the first line.
+" https://google.github.io/styleguide/pyguide.html#34-indentation
+let g:pymode_indent_hanging_width = 4
+
 " pymode lint (code checking):
 " disable in favor of ALE, but only if pylint exists
 let s:py_linters_exists = executable('pylint')
-if has_key(g:plugs, 'ale')
+if has_key(g:plugs, 'ale') || g:dotfiles_completion_backend == '@lsp'
   if s:py_linters_exists
     let g:pymode_lint = 0
   else
@@ -2133,7 +2296,8 @@ endif
 " in macOS, use Skim as the default LaTeX PDF viewer (for vimtex)
 " for :Vimtexview, move Skim's position to where the cursor currently points to.
 if has('mac')
-  if executable('texshop-preview') && isdirectory('/Applications/TeX/TeXShop.app')
+  let s:texshop_present = isdirectory('/Applications/TeX/TeXShop.app') || isdirectory('/Applications/TeXShop.app')
+  if executable('texshop-preview') && s:texshop_present
     " ~/.dotfiles/bin/texshop-preview
     let g:vimtex_view_general_viewer = 'texshop-preview'
   else

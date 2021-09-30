@@ -211,6 +211,16 @@ function deactivate() {
   [[ -n "$CONDA_DEFAULT_ENV" ]] && conda deactivate || source deactivate
 }
 
+function conda-activate.d() {
+    # Ensure the current conda environment's activate.d directory.
+    if [[ -z "$CONDA_PREFIX" ]]; then
+        >&2 echo "conda environment not found."
+        return 1;
+    fi
+    mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+    echo $CONDA_PREFIX/etc/conda/activate.d/$1
+}
+
 # virtualenv
 alias wo='workon'
 
@@ -222,6 +232,9 @@ alias pip3='python3 -m pip'
 alias mypy='python -m mypy'
 alias pycodestyle='python -m pycodestyle'
 alias pylint='python -m pylint'
+
+# pip
+alias pip-search='pip_search'
 
 # PREFIX/bin/python -> PREFIX/bin/ipython, etc.
 alias ipdb='${$(which python)%/*}/ipdb'
@@ -260,8 +273,10 @@ function pip-list-fzf() {
   pip list "$@" | fzf --header-lines 2 --reverse --nth 1 --multi | awk '{print $1}'
 }
 function pip-search-fzf() {
+  # 'pip search' is gone; try: pip install pip_search
+  if ! (( $+commands[pip_search] )); then echo "pip_search not found (Try: pip install pip_search)."; return 1; fi
   if [[ -z "$1" ]]; then echo "argument required"; return 1; fi
-  pip search "$@" | grep '^[a-z]' | fzf --reverse --nth 1 --multi --no-sort | awk '{print $1}'
+  pip-search "$@" | fzf --reverse --multi --no-sort --header-lines=4 | awk '{print $3}'
 }
 function conda-list-fzf() {
   conda list "$@" | fzf --header-lines 3 --reverse --nth 1 --multi | awk '{print $1}'
@@ -313,6 +328,21 @@ function gcp-instances-fzf() {
 
 # }}}
 
+
+# FZF magics ======================================= {{{
+
+rgfzf () {
+    # ripgrep
+    if [ ! "$#" -gt 0 ]; then
+        echo "Usage: rgfzf <query>"
+        return 1
+    fi
+    rg --files-with-matches --no-messages "$1" | \
+        fzf --prompt "$1 > " \
+        --reverse --multi --preview "rg --ignore-case --pretty --context 10 '$1' {}"
+}
+
+# }}}
 
 # Etc ======================================= {{{
 

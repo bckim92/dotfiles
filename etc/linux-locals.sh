@@ -50,6 +50,31 @@ for asset in J[0]['assets']:
 
 #---------------------------------------------------------------------------------------------------
 
+install_git() {
+    # installs a modern version of git locally.
+    set -e
+
+    GIT_VER="2.30.0"
+    TMP_GIT_DIR="/tmp/$USER/git"; mkdir -p $TMP_GIT_DIR
+
+    wget -N -O $TMP_GIT_DIR/git.tar.gz "https://github.com/git/git/archive/v${GIT_VER}.tar.gz"
+    tar -xvzf $TMP_GIT_DIR/git.tar.gz -C $TMP_GIT_DIR --strip-components 1
+    cd $TMP_GIT_DIR
+
+    make configure
+    ./configure --prefix="$PREFIX" --with-curl --with-expat
+    make clean
+    make -j8 && make install
+
+    ~/.local/bin/git --version
+
+    if [[ ! -f "$(~/.local/bin/git --exec-path)/git-remote-https" ]]; then
+        echo -e "${COLOR_YELLOW}Warning: $(~/.local/bin/git --exec-path)/git-remote-https not found. "
+        echo -e "https:// git url will not work. Please install libcurl-dev and try again.${COLOR_NONE}"
+        false;
+    fi
+}
+
 install_ncurses() {
     # installs ncurses (shared libraries and headers) into local namespaces.
     set -e
@@ -98,6 +123,8 @@ install_node() {
     node --version
 
     # install some useful nodejs based utility (~/.local/lib/node_modules)
+    $HOME/.local/bin/npm install -g yarn
+    which yarn && yarn --version
     $HOME/.local/bin/npm install -g http-server diff-so-fancy || true;
 }
 
@@ -261,7 +288,7 @@ install_neovim() {
     # install neovim nightly
     set -e
 
-    NEOVIM_VERSION="v0.4.3"
+    NEOVIM_VERSION="v0.5.1"
     VERBOSE=""
     for arg in "$@"; do
       if [ "$arg" == "--nightly" ]; then

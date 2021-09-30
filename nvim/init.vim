@@ -8,6 +8,8 @@ function! s:show_warning_message(hlgroup, msg)
     echom a:msg | echohl None
 endfunction
 
+let s:uname = substitute(system('uname -s'), '\n', '', '')
+
 " Specify python host (preferrably system default) for neovim.
 " The 'neovim' package must be installed in that python:
 " e.g. /usr/bin/pip install neovim
@@ -27,10 +29,17 @@ if executable("python3")
   let s:python3_local = substitute(system("which python3"), '\n\+$', '', '')
 
   function! Python3_determine_pip_options()
-    let l:pip_options = '--user --upgrade '
-    if empty(substitute(system("python3 -c 'import site; print(site.getusersitepackages())' 2>/dev/null"), '\n\+$', '', ''))
-      " virtualenv pythons may not have site-packages, hence no 'pip -user'
-      let l:pip_options = '--upgrade '
+    if system("python3 -c 'import sys; print(sys.prefix != getattr(sys, \"base_prefix\", sys.prefix))' 2>/dev/null") =~ "True"
+      " This is probably a user-namespace virtualenv python. `pip` won't accept --user option.
+      " See pip._internal.utils.virtualenv._running_under_venv()
+      let l:pip_options = '--upgrade --ignore-installed'
+    else
+      " Probably system(global) or anaconda python.
+      let l:pip_options = '--user --upgrade --ignore-installed'
+    endif
+    " mac: Force greenlet to be compiled from source due to potential architecture mismatch (pynvim#473)
+    if s:uname ==? 'Darwin'
+      let l:pip_options = l:pip_options . ' --no-binary greenlet'
     endif
     return l:pip_options
   endfunction
@@ -39,6 +48,7 @@ if executable("python3")
   " Since checking pynvim is slow (~200ms), it should be executed after vim init is done.
   call timer_start(0, { -> s:autoinstall_pynvim() })
   function! s:autoinstall_pynvim()
+    if empty(g:python3_host_prog) | return | endif
     let s:python3_neovim_path = substitute(system(g:python3_host_prog . " -c 'import pynvim; print(pynvim.__path__)' 2>/dev/null"), '\n\+$', '', '')
     if empty(s:python3_neovim_path)
       " auto-install 'neovim' python package for the current python3 (virtualenv, anaconda, or system-wide)
@@ -107,3 +117,36 @@ endif
 source ~/.vimrc
 
 set rtp+=~/.vim
+
+
+" Neovim: Execute lua config.
+" See ~/.config/nvim/lua/config
+if has('nvim-0.5')
+  function! s:source_lua_configs(...)
+lua << EOF
+    require 'config/lsp'
+EOF
+  endfunction
+  function! s:reload_buffers()
+    " reattach LSP on all (named) buffers after reloading the config
+    let l:current_buffer = bufnr('%')
+    execute 'silent! bufdo if &buftype == "" | e | endif'
+    if l:current_buffer >= 0
+      execute printf('buffer %d', l:current_buffer)
+    endif
+  endfunction
+
+  " If missing plugins (and lua modules) are going to be installed on VimEnter,
+  " lua-based config files should be sourced after they become available.
+  " Otherwise, we let them execute as early as we can during init.vim,
+  " because startup buffers may not have LSP clients correctly attached.
+  if !exists('g:plugs_missing')  " see vimrc:L23
+    call s:source_lua_configs()
+  else
+    " Some plugins needs to be installed;
+    " source lsp configs after PlugInstall is done
+    autocmd VimEnter *
+          \ call s:source_lua_configs() |
+          \ call s:reload_buffers()    " this shouldn't run until init is done
+  endif
+endif
