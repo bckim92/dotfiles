@@ -95,6 +95,7 @@ Plug 'tmux-plugins/vim-tmux-focus-events'
 "endif
 Plug 'tpope/vim-fugitive'
 Plug 'junegunn/gv.vim'
+Plug 'rbong/vim-flog'
 Plug 'airblade/vim-gitgutter'
 if has('nvim-0.4.0') && exists('*nvim_open_win')
   " git blame with floating window (requires nvim 0.4.0+)
@@ -145,9 +146,16 @@ Plug 'tomtom/tlib_vim'
 Plug 'junegunn/vader.vim'
 Plug 'MarcWeber/vim-addon-mw-utils'
 Plug 'tpope/vim-eunuch'
-Plug 'rizzatti/dash.vim',   { 'on': 'Dash' }
 Plug 'wookayin/vim-typora', { 'on': 'Typora' }
 Plug 'liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
+
+if s:darwin
+  if has('nvim-0.5.0')
+    Plug 'mrjones2014/dash.nvim'
+  else
+    Plug 'rizzatti/dash.vim',   { 'on': 'Dash' }
+  endif
+endif
 
 if has('nvim-0.5.0')
   " Some lua-powered plugins for neovim 0.5.0+
@@ -250,11 +258,19 @@ endif
 if g:dotfiles_completion_backend == '@lsp'
   Plug 'neovim/nvim-lspconfig'
   Plug 'williamboman/nvim-lsp-installer'
-  Plug 'hrsh7th/nvim-compe'
+  Plug 'folke/lua-dev.nvim'
+
+  Plug 'hrsh7th/nvim-cmp'
+  Plug 'hrsh7th/cmp-buffer'
+  Plug 'hrsh7th/cmp-nvim-lsp'
+  Plug 'hrsh7th/cmp-path'
+  Plug 'quangnguyen30192/cmp-nvim-ultisnips'
+
   Plug 'ray-x/lsp_signature.nvim'
   Plug 'nvim-lua/lsp-status.nvim'
   Plug 'folke/trouble.nvim'
   Plug 'kyazdani42/nvim-web-devicons'
+  Plug 'onsails/lspkind-nvim'
 
   UnPlug 'ervandew/supertab'   " Custom <TAB> mapping for coc.nvim supercedes supertab
   UnPlug 'w0rp/ale'            " Disable ALE for now (TODO: we might still need it for LSP-lacking filetypes)
