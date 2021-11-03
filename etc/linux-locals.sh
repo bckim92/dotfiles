@@ -199,9 +199,10 @@ install_bazel() {
 
 install_anaconda() {
     # installs Anaconda-python3. (Deprecated: Use miniconda)
-    # https://www.anaconda.com/download/#linux
+    # https://www.anaconda.com/products/individual
+    # https://repo.anaconda.com/archive/Anaconda3-2021.05-Linux-x86_64.sh
     set -e
-    ANACONDA_VERSION="5.2.0"
+    ANACONDA_VERSION="2021.05"
 
     if [ "$1" != "--force" ]; then
         echo "Please use miniconda instead. Use --force option to proceed." && exit 1;
@@ -209,7 +210,7 @@ install_anaconda() {
 
     # https://www.anaconda.com/download/
     TMP_DIR="/tmp/$USER/anaconda/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
-    wget -nc "https://repo.continuum.io/archive/Anaconda3-${ANACONDA_VERSION}-Linux-x86_64.sh"
+    wget -nc "https://repo.anaconda.com/archive/Anaconda3-${ANACONDA_VERSION}-Linux-x86_64.sh"
 
     # will install at $HOME/.anaconda3 (see zsh config for PATH)
     ANACONDA_PREFIX="$HOME/.anaconda3/"
@@ -230,14 +231,9 @@ install_miniconda() {
     MINICONDA_PREFIX="$HOME/.miniconda3/"
     bash "Miniconda3-latest-Linux-x86_64.sh" -b -p ${MINICONDA_PREFIX}
 
-    # 3.7 as of July 2020
+    # 3.9.5 as of Nov 2021
     $MINICONDA_PREFIX/bin/python --version
-
-    #echo "${COLOR_YELLOW}Will downgrade python from 3.7 to 3.6.${COLOR_NONE}"
-    #$MINICONDA_PREFIX/bin/conda install -y 'python==3.6.*'
-
-    $MINICONDA_PREFIX/bin/python --version
-    echo "${COLOR_GREEN}All set!${COLOR_NONE}"
+    echo -e "${COLOR_GREEN}All set!${COLOR_NONE}"
 }
 
 install_vim() {
@@ -444,6 +440,37 @@ install_lazygit() {
 
   echo -e "\n\n${COLOR_WHITE}$(which lazydocker)${COLOR_NONE}"
   $PREFIX/bin/lazygit --version
+}
+
+install_mujoco() {
+  # https://mujoco.org/download
+  set -e; set -x
+  local mujoco_version="mujoco210"
+
+  local MUJOCO_ROOT=$HOME/.mujoco/$mujoco_version
+  if [[ -d "$MUJOCO_ROOT" ]]; then
+    echo -e "${COLOR_YELLOW}Error: $MUJOCO_ROOT already exists.${COLOR_NONE}"
+    return 1;
+  fi
+
+  local tmpdir="/tmp/$USER/mujoco"
+  mkdir -p $tmpdir && cd $tmpdir
+  mkdir -p $HOME/.mujoco
+
+  local download_url="https://mujoco.org/download/${mujoco_version}-linux-x86_64.tar.gz"
+  local filename="$(basename $download_url)"
+  wget -N -O $tmpdir/$filename "$download_url"
+  tar -xvzf "$filename" -C $tmpdir
+
+  mv $tmpdir/$mujoco_version $HOME/.mujoco/
+  test -d $MUJOCO_ROOT
+
+  $MUJOCO_ROOT/bin/testspeed $MUJOCO_ROOT/model/scene.xml 1000
+  set +x
+
+  echo -e "${COLOR_GREEN}MUJOCO_ROOT = $MUJOCO_ROOT${COLOR_NONE}"
+  echo -e "${COLOR_WHITE}Done. Please don't forget to set LD_LIBRARY_PATH \
+   (should include $MUJOCO_ROOT/bin).${COLOR_NONE}\n"
 }
 
 

@@ -128,32 +128,76 @@ for _, lsp_name in ipairs(builtin_lsp_servers) do
   end
 end
 
+-------------------------
+-- LSP Handlers (general)
+-------------------------
+-- :help lsp-method
+-- :help lsp-handler
+
+vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = 'single' })
+
 
 ------------------
 -- LSP diagnostics
 ------------------
 -- https://github.com/neovim/nvim-lspconfig/wiki/UI-customization
 
--- Customize how to show diagnostics: Do not use distracting virtual text
--- :help lsp-handler-configuration
-vim.lsp.handlers["textDocument/publishDiagnostics"] = vim.lsp.with(
-    vim.lsp.diagnostic.on_publish_diagnostics, {
-      virtual_text = false,     -- disable virtual text
-      signs = true,             -- show signs
-      update_in_insert = false, -- delay update diagnostics
-      -- display_diagnostic_autocmds = { "InsertLeave" },
-    }
-  )
+-- Customize how to show diagnostics:
+-- No virtual text (distracting!), show popup window on hover.
+if vim.fn.has('nvim-0.6.0') > 0 then
+  -- @see https://github.com/neovim/neovim/pull/16057 for new APIs
+  vim.diagnostic.config({
+    virtual_text = false,
+    float = {
+      source = 'always',
+      border = 'single',
+    },
+  })
+  _G.LspDiagnosticsShowPopup = function()
+    return vim.diagnostic.open_float(0, {scope="cursor"})
+  end
+else  -- neovim 0.5.0
+  -- @see :help lsp-handler-configuration
+  vim.lsp.handlers["textDocument/publishDiagnostics"] = vim.lsp.with(
+      vim.lsp.diagnostic.on_publish_diagnostics, {
+        virtual_text = false,     -- disable virtual text
+        signs = true,             -- show signs
+        update_in_insert = false, -- delay update diagnostics
+        -- display_diagnostic_autocmds = { "InsertLeave" },
+      }
+    )
+  _G.LspDiagnosticsShowPopup = function()
+    ---@diagnostic disable-next-line: deprecated
+    return vim.lsp.diagnostic.show_line_diagnostics({focusable = false})
+  end
+end
 
--- Instead, show line diagnostics in a pop-up window on hover
+-- Show diagnostics in a pop-up window on hover
+_G.LspDiagnosticsPopupHandler = function()
+  local current_cursor = vim.api.nvim_win_get_cursor(0)
+  local last_popup_cursor = vim.w.lsp_diagnostics_last_cursor or {nil, nil}
+
+  -- Show the popup diagnostics window,
+  -- but only once for the current cursor location (unless moved afterwards).
+  if not (current_cursor[1] == last_popup_cursor[1] and current_cursor[2] == last_popup_cursor[2]) then
+    vim.w.lsp_diagnostics_last_cursor = current_cursor
+    _G.LspDiagnosticsShowPopup()
+  end
+end
 vim.cmd [[
 augroup LSPDiagnosticsOnHover
   autocmd!
-  autocmd CursorHold * lua vim.lsp.diagnostic.show_line_diagnostics({focusable = false})
+  autocmd CursorHold *   lua _G.LspDiagnosticsPopupHandler()
 augroup END
 ]]
 
 -- Redefine signs (:help diagnostic-signs)
+-- neovim <= 0.5.1
+vim.fn.sign_define("LspDiagnosticsSignError",       {text = "✘", texthl = "DiagnosticSignError"})
+vim.fn.sign_define("LspDiagnosticsSignWarning",     {text = "", texthl = "DiagnosticSignWarn"})
+vim.fn.sign_define("LspDiagnosticsSignInformation", {text = "i", texthl = "DiagnosticSignInfo"})
+vim.fn.sign_define("LspDiagnosticsSignHint",        {text = "", texthl = "DiagnosticSignHint"})
+-- neovim >= 0.6.0
 vim.fn.sign_define("DiagnosticSignError",  {text = "✘", texthl = "DiagnosticSignError"})
 vim.fn.sign_define("DiagnosticSignWarn",   {text = "", texthl = "DiagnosticSignWarn"})
 vim.fn.sign_define("DiagnosticSignInfo",   {text = "i", texthl = "DiagnosticSignInfo"})
@@ -231,6 +275,18 @@ cmp.setup {
     { name = 'path', priority = 30, },
     { name = 'buffer', priority = 10 },
   },
+  sorting = {
+    comparators = {
+      cmp.config.compare.offset,
+      cmp.config.compare.exact,
+      cmp.config.compare.score,
+      require("cmp-under-comparator").under,
+      cmp.config.compare.kind,
+      cmp.config.compare.sort_text,
+      cmp.config.compare.length,
+      cmp.config.compare.order,
+    },
+  },
 }
 
 -- Highlights for nvim-cmp's custom popup menu (GH-224)
@@ -242,6 +298,49 @@ vim.cmd [[
   hi CmpItemAbbrDeprecated guifg=#adb5bd
   hi CmpItemKind           guifg=#cc5de8
   hi CmpItemMenu           guifg=#cfa050
+]]
+
+-----------------------------
+-- Configs for PeekDefinition
+-----------------------------
+function PeekDefinition()
+  local params = vim.lsp.util.make_position_params()
+  local definition_callback = function (_, result)
+    if result == nil or vim.tbl_isempty(result) then
+      print("PeekDefinition: " .. "cannot find the definition.")
+      return nil
+    end
+    --- either Location | LocationLink
+    --- https://microsoft.github.io/language-server-protocol/specification#location
+    local def_result = result[1]
+
+    -- Peek defintion. Currently, use quickui but a better alternative should be found.
+    -- vim.lsp.util.preview_location(result[1])
+    local def_uri = def_result.uri or def_result.targetUri
+    local def_range = def_result.range or def_result.targetSelectionRange
+    vim.fn['quickui#preview#open'](vim.uri_to_fname(def_uri), {
+        cursor = def_range.start.line,
+        number = 1,   -- show line number
+        persist = 0,
+      })
+  end
+  -- Asynchronous request doesn't work very smoothly, so we use synchronous one with timeout;
+  -- return vim.lsp.buf_request(0, 'textDocument/definition', params, definition_callback)
+  local results, err = vim.lsp.buf_request_sync(0, 'textDocument/definition', params, 1000)
+  if results then
+    for client_id, result in pairs(results) do
+      definition_callback(client_id, result.result)
+    end
+  else
+    print("PeekDefinition: " .. err)
+  end
+end
+
+vim.cmd [[
+  command! -nargs=0 PeekDefinition      :lua PeekDefinition()
+  command! -nargs=0 PreviewDefinition   :PeekDefinition
+  nmap <leader>K     :<C-U>PeekDefinition<CR>
+  nmap <silent> gp   :<C-U>PeekDefinition<CR>
 ]]
 
 
@@ -306,12 +405,19 @@ telescope.setup {
 -- Custom Telescope mappings
 vim.cmd [[
 command! -nargs=0 Highlights    :Telescope highlights
+command! -nargs=0 CodeActions   :Telescope lsp_code_actions
+call CommandAlias("CA", "CodeActions")
 ]]
 
 -- Telescope extensions
-if vim.fn['HasPlug']('telescope-frecency.nvim') == 1 then
-  telescope.load_extension("frecency")
-  vim.cmd [[
-    command! -nargs=0 Frecency      :Telescope frecency
-  ]]
-end
+-- These should be executed *AFTER* other plugins are loaded
+vim.defer_fn(function()
+  if vim.fn['HasPlug']('telescope-frecency.nvim') == 1 then
+    telescope.load_extension("frecency")
+    vim.cmd [[ command! -nargs=0 Frecency       :Telescope frecency ]]
+  end
+  if vim.fn['HasPlug']('nvim-notify') == 1 then
+    telescope.load_extension("notify")
+    vim.cmd [[ command! -nargs=0 Notifications  :Telescope notify ]]
+  end
+end, 0)

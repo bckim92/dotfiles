@@ -30,14 +30,6 @@ endfunction
 let s:floating_available = exists('*nvim_open_win') &&
       \ (exists('##MenuPopupChanged') || exists('##CompleteChanged'))
 
-" Utilities to tell whether a plugin is configured or installed.
-function! HasPlug(name) abort
-  return has_key(g:plugs, a:name)
-endfunction
-function! IsPlugInstalled(name) abort
-  return has_key(g:plugs, a:name) && isdirectory(g:plugs[a:name].dir)
-endfunction
-
 "==============================================
 call plug#begin('~/.vim/plugged')
 "==============================================
@@ -47,12 +39,14 @@ call plug#begin('~/.vim/plugged')
 Plug 'flazz/vim-colorschemes'
 Plug 'embear/vim-localvimrc', PlugCond(has('patch-7.4.1154'))  " requires v:false
 Plug 'tweekmonster/helpful.vim', { 'on' : ['HelpfulVersion'] }
+Plug 'dstein64/vim-startuptime', { 'on': ['StartupTime'] }
 
 " Vim Interfaces
 " -------------------------------------
 if has('nvim-0.5.0')
   " Status line: use lualine.nvim (fork)
-  Plug 'shadmansaleh/lualine.nvim'
+  Plug 'nvim-lualine/lualine.nvim'
+  ForcePlugURI 'lualine.nvim'
 else
   Plug 'vim-airline/vim-airline'
   Plug 'vim-airline/vim-airline-themes'
@@ -62,17 +56,18 @@ Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all --no-update-rc' }
 Plug 'junegunn/fzf.vim'
 Plug 'wookayin/fzf-ripgrep.vim'
 if has('nvim-0.4.0')
-  Plug 'liuchengxu/vim-clap'   " Deprecated
   Plug 'voldikss/vim-floaterm'
 endif
 if has('nvim-0.4.0') || has('popup')
   Plug 'skywind3000/vim-quickui'
 endif
 Plug 'mg979/vim-xtabline'
-Plug 'ervandew/supertab'
-Plug 'scrooloose/nerdtree'
-Plug 'jistr/vim-nerdtree-tabs'
+
+let g:_nerdtree_lazy_events = ['NERDTree', 'NERDTreeToggle', 'NERDTreeTabsToggle', '<Plug>NERDTreeTabsToggle']
+Plug 'scrooloose/nerdtree', { 'on': g:_nerdtree_lazy_events }
+Plug 'jistr/vim-nerdtree-tabs', { 'on': g:_nerdtree_lazy_events }
 Plug 'Xuyuanp/nerdtree-git-plugin'
+
 Plug 'vim-voom/VOoM', { 'on' : ['Voom', 'VoomToggle'] }
 Plug 'tpope/vim-dispatch', { 'tag' : 'v1.1' }
 if has('nvim') || v:version >= 800
@@ -80,6 +75,7 @@ if has('nvim') || v:version >= 800
 endif
 if has('nvim-0.4.0')
   Plug 'gelguy/wilder.nvim', { 'do': function('UpdateRemote') }
+  Plug 'romgrk/fzy-lua-native'
 endif
 Plug 'tpope/vim-tbone'
 Plug 'szw/vim-maximizer'    " zoom and unzoom!
@@ -96,7 +92,11 @@ Plug 'tmux-plugins/vim-tmux-focus-events'
 Plug 'tpope/vim-fugitive'
 Plug 'junegunn/gv.vim'
 Plug 'rbong/vim-flog'
-Plug 'airblade/vim-gitgutter'
+if has('nvim-0.5.0')
+  Plug 'lewis6991/gitsigns.nvim'
+else
+  Plug 'airblade/vim-gitgutter'
+endif
 if has('nvim-0.4.0') && exists('*nvim_open_win')
   " git blame with floating window (requires nvim 0.4.0+)
   Plug 'rhysd/git-messenger.vim'
@@ -147,11 +147,14 @@ Plug 'junegunn/vader.vim'
 Plug 'MarcWeber/vim-addon-mw-utils'
 Plug 'tpope/vim-eunuch'
 Plug 'wookayin/vim-typora', { 'on': 'Typora' }
-Plug 'liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
+if has('nvim-0.5.0')
+  Plug 'folke/which-key.nvim'
+endif
 
-if s:darwin
+if s:darwin && isdirectory('/Applications/Dash.app')
   if has('nvim-0.5.0')
-    Plug 'mrjones2014/dash.nvim'
+    Plug 'mrjones2014/dash.nvim', { 'do': 'make install',
+          \ 'on': ['Dash', 'DashWord'] }
   else
     Plug 'rizzatti/dash.vim',   { 'on': 'Dash' }
   endif
@@ -159,6 +162,7 @@ endif
 
 if has('nvim-0.5.0')
   " Some lua-powered plugins for neovim 0.5.0+
+  Plug 'rcarriga/nvim-notify'
   Plug 'norcalli/nvim-colorizer.lua'
   Plug 'kyazdani42/nvim-tree.lua'
   Plug 'nvim-lua/plenary.nvim'
@@ -171,35 +175,8 @@ endif
 
 " Syntax, Completion, Language Servers, etc.
 " ------------------------------------------
+
 Plug 'editorconfig/editorconfig-vim'
-
-Plug 'sheerun/vim-polyglot', {'tag': 'v4.2.1'}   " conflicts with vimtex (see polyglot#484)
-Plug 'tmux-plugins/vim-tmux'
-
-Plug 'klen/python-mode', { 'branch': 'develop' } |
-      \ Plug 'wookayin/vim-python-enhanced-syntax'
-if has('nvim') && s:python3_version() >= '3.5'
-  Plug 'numirias/semshi', { 'do': function('UpdateRemote') }
-  Plug 'stsewd/isort.nvim', { 'do': function('UpdateRemote') }
-endif
-if has('python3') && s:python3_version() >= '3.5'
-  Plug 'wookayin/vim-autoimport'
-endif
-
-Plug 'artur-shaik/vim-javacomplete2'
-
-Plug 'vim-pandoc/vim-pandoc'
-Plug 'vim-pandoc/vim-pandoc-syntax'
-"Plug 'LaTeX-Box-Team/LaTeX-Box'
-Plug 'lervag/vimtex', { 'for' : ['tex', 'plaintex'] }
-Plug 'machakann/vim-Verdin', { 'for': ['vim'] }   " vimscript omnifunc
-Plug 'gisraptor/vim-lilypond-integrator'
-Plug 'tfnico/vim-gradle'
-Plug 'Tyilo/applescript.vim'
-Plug 'rdolgushin/groovy.vim'
-
-Plug 'xolox/vim-misc'
-Plug 'xolox/vim-lua-ftplugin', { 'for' : ['lua'] }
 
 " [Completion Engine or LSP backend]
 " We have a long history and I want to make completion work for legacy and
@@ -212,11 +189,11 @@ function! s:choose_completion_backend()
     return '@lsp'
   endif
 
-  " 2. Neovim 0.3.1+ or vim 8.0+: coc.nvim
+  " 2. Neovim 0.4.0+ or vim 8.0.1453+: coc.nvim
   "   (i) Proper neovim/vim8 version and python3
   "   (ii) 'node' and 'npm' are installed
   "   (iii) Directory ~/.config/coc exists (opt-in)
-  if (has('nvim-0.3.1') || v:version >= 800) &&
+  if (has('nvim-0.4.0') || (!has('nvim') && has('patch-8.0.1453'))) &&
         \ executable('npm') && executable('python3') &&
         \ isdirectory(expand("\~/.config/coc/"))
     " Check minimum node version
@@ -231,16 +208,10 @@ function! s:choose_completion_backend()
   endif
 
   " (At this point, apparently we are maybe using legacy (neo)vim. Warn users!)
-  if has('nvim') && !has('nvim-0.3.1')
+  if has('nvim') && !has('nvim-0.4.0')
     autocmd VimEnter * echohl WarningMsg | echom
-          \ 'WARNING: Neovim 0.3.1+ or Vim 8.0+ is required for coc.nvim. '
+          \ 'WARNING: Neovim version is too old. Please install latest neovim (0.5.1+). '
           \ . '(Try: dotfiles install neovim)' | echohl None
-    return
-  endif
-
-  " 3. Legacy Neovim: Deoplete
-  if has('nvim') && s:python3_version() >= '3.6.1'
-    return '@deoplete'
   endif
 
   " No completion available :(
@@ -265,6 +236,7 @@ if g:dotfiles_completion_backend == '@lsp'
   Plug 'hrsh7th/cmp-nvim-lsp'
   Plug 'hrsh7th/cmp-path'
   Plug 'quangnguyen30192/cmp-nvim-ultisnips'
+  Plug 'lukas-reineke/cmp-under-comparator'
 
   Plug 'ray-x/lsp_signature.nvim'
   Plug 'nvim-lua/lsp-status.nvim'
@@ -284,9 +256,6 @@ if g:dotfiles_completion_backend == '@coc'
     Plug 'antoinemadec/coc-fzf'
   endif
 
-  " coc supercedes deoplete and supertab
-  UnPlug 'ervandew/supertab'   " Custom <TAB> mapping for coc.nvim supercedes supertab
-
   if s:floating_available
     " disable vim-which-key if floating windows are used (have some conflicts)
     UnPlug 'liuchengxu/vim-which-key'
@@ -301,25 +270,41 @@ if g:dotfiles_completion_backend == '@coc'
   UnPlug 'kyazdani42/nvim-tree.lua'   " use coc-explorer
 endif
 
-" 3. [Legacy neovim: deoplete]
-if g:dotfiles_completion_backend == '@deoplete'
-  Plug 'Shougo/deoplete.nvim', { 'do': function('UpdateRemote') }
-  Plug 'zchee/deoplete-jedi'    " Python
-  Plug 'zchee/deoplete-clang'   " C/C++
-  Plug 'zchee/deoplete-zsh', { 'for': ['zsh'] }     " zsh
-endif
-
-if g:dotfiles_completion_backend == '' || g:dotfiles_completion_backend == '@deoplete'
+" no LSP/coc support (legacy)
+if g:dotfiles_completion_backend == ''
   " Use jedi-vim, only if we are not using coc.nvim or LSP.
   Plug 'davidhalter/jedi-vim'
-endif
-
-if g:dotfiles_completion_backend == '' || g:dotfiles_completion_backend == '@deoplete'
+  " Legacy support for <TAB> in the completion context
+  Plug 'ervandew/supertab'
   " echodoc: not needed for coc.nvim and nvim-lsp
   if has('nvim')
     Plug 'Shougo/echodoc.vim'
   endif
 endif
+
+" Other language-specific plugins supplementary and orthogonal to LSP, coc, etc.
+" ------------------------------------------------------------------------------
+Plug 'klen/python-mode', { 'branch': 'develop' }
+Plug 'wookayin/vim-python-enhanced-syntax'
+
+" polyglot: cannot use latest version (see GH-608, GH-613)
+Plug 'sheerun/vim-polyglot', {'tag': 'v4.2.1'}
+Plug 'tmux-plugins/vim-tmux'
+
+if has('nvim') && s:python3_version() >= '3.5'
+  Plug 'numirias/semshi', { 'do': function('UpdateRemote') }
+  Plug 'stsewd/isort.nvim', { 'do': function('UpdateRemote') }
+  Plug 'wookayin/vim-autoimport'
+endif
+
+Plug 'vim-pandoc/vim-pandoc'
+Plug 'vim-pandoc/vim-pandoc-syntax'
+Plug 'lervag/vimtex', { 'for' : ['tex', 'plaintex'] }
+Plug 'machakann/vim-Verdin', { 'for': ['vim'] }   " vimscript omnifunc
+Plug 'gisraptor/vim-lilypond-integrator'
+Plug 'tfnico/vim-gradle'
+Plug 'Tyilo/applescript.vim'
+Plug 'rdolgushin/groovy.vim'
 
 
 " =======================================================
@@ -334,5 +319,6 @@ call plug#end()
 delcom UnPlug
 delcom ForcePlugURI
 silent delfunction PlugCond
+silent unlet g:_nerdtree_lazy_events
 
 " vim: set ts=2 sts=2 sw=2:

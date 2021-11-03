@@ -57,6 +57,7 @@ alias zshrc='vim +cd\ ~/.zsh -O ~/.zsh/zshrc ~/.zsh/zsh.d/alias.zsh'
 
 # create a new session with name
 alias tmuxnew='tmux new -s'
+alias tnew='tmuxnew'
 # list sessions
 alias tmuxl='tmux list-sessions'
 # tmuxa <session> : attach to <session> (force 256color and detach others)
@@ -186,11 +187,10 @@ function gsd() {
 }
 
 # using the vim plugin GV/Flog
-function _vim_flog {
-    vim -c ":Flog $1"
+function _vim_gv {
+    vim -c ":GV $1"
 }
-alias flog='_vim_flog'
-alias gv='_vim_flog'
+alias gv='_vim_gv'
 alias gva='gv --all'
 
 # cd to $(git-root)
