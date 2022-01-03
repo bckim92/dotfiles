@@ -61,7 +61,9 @@ endif
 if has('nvim-0.4.0') || has('popup')
   Plug 'skywind3000/vim-quickui'
 endif
-Plug 'mg979/vim-xtabline'
+if exists('##TermOpen') || exists('##TerminalOpen')
+  Plug 'mg979/vim-xtabline'
+endif
 
 let g:_nerdtree_lazy_events = ['NERDTree', 'NERDTreeToggle', 'NERDTreeTabsToggle', '<Plug>NERDTreeTabsToggle']
 Plug 'scrooloose/nerdtree', { 'on': g:_nerdtree_lazy_events }
@@ -166,11 +168,7 @@ if has('nvim-0.5.0')
   Plug 'norcalli/nvim-colorizer.lua'
   Plug 'kyazdani42/nvim-tree.lua'
   Plug 'nvim-lua/plenary.nvim'
-  Plug 'nvim-telescope/telescope.nvim'
-  if s:darwin
-    Plug 'nvim-telescope/telescope-frecency.nvim'
-    Plug 'tami5/sql.nvim'    " required for telescope-frecency
-  endif
+  Plug 'nvim-telescope/telescope.nvim', PinIf(!has('nvim-0.6.0'), '80cdb00')
 endif
 
 " Syntax, Completion, Language Servers, etc.
@@ -239,7 +237,7 @@ if g:dotfiles_completion_backend == '@lsp'
   Plug 'lukas-reineke/cmp-under-comparator'
 
   Plug 'ray-x/lsp_signature.nvim'
-  Plug 'nvim-lua/lsp-status.nvim'
+  Plug 'nvim-lua/lsp-status.nvim', PinIf(!has('nvim-0.6.0'), 'e8e5303')
   Plug 'folke/trouble.nvim'
   Plug 'kyazdani42/nvim-web-devicons'
   Plug 'onsails/lspkind-nvim'
@@ -290,9 +288,12 @@ Plug 'wookayin/vim-python-enhanced-syntax'
 " polyglot: cannot use latest version (see GH-608, GH-613)
 Plug 'sheerun/vim-polyglot', {'tag': 'v4.2.1'}
 Plug 'tmux-plugins/vim-tmux'
+Plug 'fladson/vim-kitty', { 'for': ['kitty'] }
 
 if has('nvim') && s:python3_version() >= '3.5'
-  Plug 'numirias/semshi', { 'do': function('UpdateRemote') }
+  " Semshi is no longer being maintained. Use my own fork
+  Plug 'wookayin/semshi', { 'do': function('UpdateRemote') }
+  ForcePlugURI 'semshi'
   Plug 'stsewd/isort.nvim', { 'do': function('UpdateRemote') }
   Plug 'wookayin/vim-autoimport'
 endif
@@ -319,6 +320,7 @@ call plug#end()
 delcom UnPlug
 delcom ForcePlugURI
 silent delfunction PlugCond
+silent delfunction PinIf
 silent unlet g:_nerdtree_lazy_events
 
 " vim: set ts=2 sts=2 sw=2:

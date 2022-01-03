@@ -27,16 +27,18 @@ if executable("python3")
   let s:python3_local = substitute(system("which python3"), '\n\+$', '', '')
 
   function! Python3_determine_pip_options()
-    if system("python3 -c 'import sys; print(sys.prefix != getattr(sys, \"base_prefix\", sys.prefix))' 2>/dev/null") =~ "True"
-      " This is probably a user-namespace virtualenv python. `pip` won't accept --user option.
-      " See pip._internal.utils.virtualenv._running_under_venv()
-      let l:pip_options = '--upgrade --ignore-installed'
-    else
-      " Probably system(global) or anaconda python.
-      let l:pip_options = '--user --upgrade --ignore-installed'
+    " On mac/miniconda/anaconda environments, do not use --user flag (NO ~/.local/bin)
+    let l:pip_options = ''
+    if !has('mac')
+      let l:py_prefix = substitute(system("python3 -c 'import sys; print(sys.prefix)' 2>/dev/null"), '\n\+$', '', '')
+      if l:py_prefix == "/usr" || l:py_prefix == "/usr/local"
+        let l:pip_options = '--user'
+      endif
     endif
-    " mac: Force greenlet to be compiled from source due to potential architecture mismatch (pynvim#473)
+
+    let l:pip_options .= ' --upgrade --ignore-installed'
     if has('mac')
+      " mac: Force greenlet to be compiled from source due to potential architecture mismatch (pynvim#473)
       let l:pip_options = l:pip_options . ' --no-binary greenlet'
     endif
     return l:pip_options
@@ -51,7 +53,7 @@ if executable("python3")
     if empty(s:python3_neovim_path)
       " auto-install 'neovim' python package for the current python3 (virtualenv, anaconda, or system-wide)
       let s:pip_options = Python3_determine_pip_options()
-      execute ("!" . s:python3_local . " -m pip install " . s:pip_options . " pynvim")
+      execute ("!" . g:python3_host_prog . " -m pip install " . s:pip_options . " pynvim")
       if v:shell_error != 0
         call s:show_warning_message('ErrorMsg', "Installation of pynvim failed. Python-based features may not work.")
       endif
@@ -61,7 +63,7 @@ if executable("python3")
   " Assuming that pynvim package is available (or will be installed later), use it as a host python3
   let g:python3_host_prog = s:python3_local
 else
-  echoerr "python3 is not found on your system. Most features are disabled."
+  echoerr "python3 is not found on your system: Check $PATH or $SHELL. Most features are disabled."
   let s:python3_local = ''
 endif
 
@@ -94,7 +96,7 @@ endtry
 " (with timer, make it shown frontmost over other warning messages)
 if empty(g:python3_host_version)
   call timer_start(0, { -> s:show_warning_message('ErrorMsg',
-        \ "ERROR: You don't have python3 on your $PATH. Most features are disabled.")
+        \ "ERROR: You don't have python3 on your $PATH. Check $PATH or $SHELL. Most features are disabled.")
         \ })
 elseif g:python3_host_version < '3.6.1'
   call timer_start(0, { -> s:show_warning_message('WarningMsg',
@@ -123,6 +125,7 @@ if has('nvim-0.5')
   function! s:source_lua_configs(...)
 lua << EOF
     require 'config/lsp'
+    require 'config/telescope'
 EOF
   endfunction
 
@@ -133,11 +136,11 @@ EOF
         \ call s:reload_buffers()    " this shouldn't run until init is done
 
   function! s:reload_buffers()
-    " reattach LSP on all (named) buffers after reloading the config
-    let l:current_buffer = bufnr('%')
-    execute 'silent! bufdo if &buftype == "" | e | endif'
-    if l:current_buffer >= 0 && bufexists(l:current_buffer)
-      execute printf('buffer %d', l:current_buffer)
+    " reattach LSP on all buffers, after reloading the LSP config
+    if exists('*win_getid')  " neovim or vim 7.4.1557+
+      let l:current_winid = win_getid()
+      execute 'silent! windo if _is_file_buffer() | e | endif'
+      call win_gotoid(l:current_winid)
     endif
   endfunction
 endif

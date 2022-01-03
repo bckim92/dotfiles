@@ -89,14 +89,23 @@ local builtin_lsp_servers = {
 }
 -- Optional and additional LSP setup options other than (common) on_attach, capabilities, etc.
 -- @see(config): https://github.com/neovim/nvim-lspconfig/blob/master/CONFIG.md
-local lsp_setup_opts = {
-  sumneko_lua = (function()
-    local opts = require("lua-dev").setup {}
-    opts.settings.Lua.completion.callSnippet = "Disable"
-    opts.settings.Lua.workspace.maxPreload = nil
-    return opts
-  end)(),
+local lsp_setup_opts = {}
+lsp_setup_opts['pyright'] = {
+  settings = {
+    python = {
+    },
+  },
 }
+lsp_setup_opts['sumneko_lua'] = vim.tbl_extend('force',
+  require("lua-dev").setup {}, {
+    settings = {
+      Lua = {
+        completion = { callSnippet = "Disable" },
+        workspace = { maxPreload = 2000 },
+      },
+    },
+  }
+)
 
 local lsp_installer = require("nvim-lsp-installer")
 lsp_installer.on_server_ready(function(server)
@@ -120,6 +129,7 @@ end)
 -- Automatically install if a required LSP server is missing.
 for _, lsp_name in ipairs(builtin_lsp_servers) do
   local ok, lsp = require('nvim-lsp-installer.servers').get_server(lsp_name)
+  ---@diagnostic disable-next-line: undefined-field
   if ok and not lsp:is_installed() then
     vim.defer_fn(function()
       -- lsp:install()   -- headless
@@ -134,7 +144,16 @@ end
 -- :help lsp-method
 -- :help lsp-handler
 
-vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = 'single' })
+local lsp_handlers_hover = vim.lsp.with(vim.lsp.handlers.hover, {
+  border = 'single'
+})
+vim.lsp.handlers["textDocument/hover"] = function(err, result, ctx, config)
+  local bufnr, winnr = lsp_handlers_hover(err, result, ctx, config)
+  if winnr ~= nil then
+    vim.api.nvim_win_set_option(winnr, "winblend", 20)  -- opacity for hover
+  end
+  return bufnr, winnr
+end
 
 
 ------------------
@@ -150,6 +169,7 @@ if vim.fn.has('nvim-0.6.0') > 0 then
     virtual_text = false,
     float = {
       source = 'always',
+      focusable = false,   -- See neovim#16425
       border = 'single',
     },
   })
@@ -168,7 +188,10 @@ else  -- neovim 0.5.0
     )
   _G.LspDiagnosticsShowPopup = function()
     ---@diagnostic disable-next-line: deprecated
-    return vim.lsp.diagnostic.show_line_diagnostics({focusable = false})
+    return vim.lsp.diagnostic.show_line_diagnostics({
+      focusable = false,
+      border = 'single',
+    })
   end
 end
 
@@ -181,7 +204,10 @@ _G.LspDiagnosticsPopupHandler = function()
   -- but only once for the current cursor location (unless moved afterwards).
   if not (current_cursor[1] == last_popup_cursor[1] and current_cursor[2] == last_popup_cursor[2]) then
     vim.w.lsp_diagnostics_last_cursor = current_cursor
-    _G.LspDiagnosticsShowPopup()
+    local _, winnr = _G.LspDiagnosticsShowPopup()
+    if winnr ~= nil then
+      vim.api.nvim_win_set_option(winnr, "winblend", 20)  -- opacity for diagnostics
+    end
   end
 end
 vim.cmd [[
@@ -296,7 +322,8 @@ vim.cmd [[
   hi CmpItemAbbrMatch      guifg=#f03e3e gui=bold
   hi CmpItemAbbrMatchFuzzy guifg=#fd7e14 gui=bold
   hi CmpItemAbbrDeprecated guifg=#adb5bd
-  hi CmpItemKind           guifg=#cc5de8
+  hi CmpItemKindDefault    guifg=#cc5de8
+  hi! def link CmpItemKind CmpItemKindDefault
   hi CmpItemMenu           guifg=#cfa050
 ]]
 
@@ -373,51 +400,16 @@ vim.cmd [[
 command! -nargs=0 LspStatus   echom v:lua.LspStatus()
 ]]
 
+-- Other LSP commands
+vim.cmd [[
+command! -nargs=0 LspDebug  :tab drop $HOME/.cache/nvim/lsp.log
+]]
 
 ---------------
 -- trouble.nvim
 ---------------
 require("trouble").setup {
     -- https://github.com/folke/trouble.nvim#setup
-    mode = "lsp_document_diagnostics",
+    mode = "document_diagnostics",
     auto_preview = false,
 }
-
-
----------------
--- Telescope
----------------
--- @see  https://github.com/nvim-telescope/telescope.nvim#telescope-setup-structure
-local telescope = require("telescope")
-telescope.setup {
-  defaults = {
-    mappings = {
-      i = {
-        ["<C-u>"] = false,   -- Do not map <C-u>; CTRL-U should be backward-kill-line.
-        ["<C-d>"] = false,
-        ["<C-b>"] = require("telescope.actions").preview_scrolling_up,
-        ["<C-f>"] = require("telescope.actions").preview_scrolling_down,
-      }
-    }
-  }
-}
-
--- Custom Telescope mappings
-vim.cmd [[
-command! -nargs=0 Highlights    :Telescope highlights
-command! -nargs=0 CodeActions   :Telescope lsp_code_actions
-call CommandAlias("CA", "CodeActions")
-]]
-
--- Telescope extensions
--- These should be executed *AFTER* other plugins are loaded
-vim.defer_fn(function()
-  if vim.fn['HasPlug']('telescope-frecency.nvim') == 1 then
-    telescope.load_extension("frecency")
-    vim.cmd [[ command! -nargs=0 Frecency       :Telescope frecency ]]
-  end
-  if vim.fn['HasPlug']('nvim-notify') == 1 then
-    telescope.load_extension("notify")
-    vim.cmd [[ command! -nargs=0 Notifications  :Telescope notify ]]
-  end
-end, 0)

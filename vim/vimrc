@@ -8,8 +8,8 @@ scriptencoding utf-8
 " Allow lazy execution of plugin inits (after VimEnter and then UI initializes)
 autocmd! VimEnter
 autocmd! User LazyInit
-if exists("*timer_start")
-  autocmd! VimEnter * call timer_start(0, { -> execute('doautocmd User LazyInit') })
+if exists("*timer_start") && exists('*nvim_command')  " neovim
+  autocmd! VimEnter * call timer_start(0, { -> nvim_command('doautocmd User LazyInit') })
 else  " No timer support, this will run during VimEnter (before UI draws)
   autocmd! VimEnter * call execute('doautocmd User LazyInit')
 endif
@@ -55,7 +55,7 @@ end
 
 set nocompatible
 
-if !empty($SHELL)
+if !empty($SHELL) && filereadable($SHELL)
   let &g:shell=$SHELL
 elseif filereadable('/bin/zsh')
   set shell=/bin/zsh
@@ -92,9 +92,12 @@ set textwidth=0             " disable automatic line breaking
 set cursorline
 
 " tab settings
-set tabstop=4
-set shiftwidth=4
-set softtabstop=4
+if has('vim_starting')
+  set tabstop=4
+  set shiftwidth=4
+  set softtabstop=4
+  set shiftround
+endif
 
 " tab navigation
 set showtabline=2           " always show tab pannel
@@ -114,7 +117,7 @@ endif
 if exists('##TermOpen')
   augroup TermSignColumn
     autocmd!
-    autocmd TermOpen           * set signcolumn=
+    autocmd TermOpen           * set signcolumn=no
   augroup end
 endif
 
@@ -362,6 +365,9 @@ noremap <C-j> <C-w>j
 noremap <C-k> <C-w>k
 noremap <C-l> <C-w>l
 
+noremap <M-h> <C-w>h
+noremap <M-l> <C-w>l
+
 " window navigation: aware of tmux
 let g:tmux_navigator_no_mappings = 1
 if has_key(g:plugs, 'vim-tmux-navigator') && !empty($TMUX)
@@ -378,6 +384,13 @@ nnoremap <S-Right> <C-W>>
 nnoremap <S-Left>  <C-W><
 nnoremap <S-Down>  <C-W>-
 nnoremap <S-Up>    <C-W>+
+
+if exists(':tnoremap')
+  tnoremap <S-Right> <cmd>wincmd ><CR>
+  tnoremap <S-Left>  <cmd>wincmd <<CR>
+  tnoremap <S-Down>  <cmd>wincmd -<CR>
+  tnoremap <S-Up>    <cmd>wincmd +<CR>
+endif
 
 
 " zoom and unzoom (like tmux) -- by 'vim-maximizer'
@@ -422,11 +435,12 @@ if has('nvim')
 
   " Mapping for <c-hjkl> in terminal mode
   " <c-h> might not work: see https://github.com/neovim/neovim/issues/2048
-  tmap <silent> <C-h> <C-\><C-n>:wincmd h<CR>
-  tmap <silent> <C-j> <C-\><C-n>:wincmd j<CR>
-  tmap <silent> <C-k> <C-\><C-n>:wincmd k<CR>
-  "tmap <C-l> <C-\><C-n><C-l>
-  " TODO: <c-l> is for clear screen...?
+  tmap <silent> <C-h> <C-\><C-n><cmd>wincmd h<CR>
+  tmap <silent> <C-j> <C-\><C-n><cmd>wincmd j<CR>
+  tmap <silent> <C-k> <C-\><C-n><cmd>wincmd k<CR>
+  "tmap <silent> <C-l> <C-\><C-n><cmd>wincmd l<CR>   " Ctrl-L is clear screen
+  tmap <silent> <M-h> <C-\><C-n><cmd>wincmd h<CR>
+  tmap <silent> <M-l> <C-\><C-n><cmd>wincmd l<CR>
 
   " Ctrl-E, Ctrl-Y: Scroll window in terminal-normal mode
   tmap <silent> <C-e> <C-\><C-n><C-e>
@@ -691,6 +705,9 @@ function! s:open_vimrc_tab()
   wincmd t  " focus on the first window (~/.vimrc)
 endfunction
 
+" :Plugins
+command! -nargs=0 Plugins  exec ":rightbelow vs " . resolve(expand("~/.vim/plugins.vim"))
+
 " <leader>{y,x,p} : {yank,cut,paste} wrt the system clipboard
 map <leader>y "*y
 noremap <leader>x "*x
@@ -863,7 +880,7 @@ call CommandAlias('tabnewh', "tabnew %:h/<C-R>=EatWhitespace()<CR>")
 
 
 " :Toggle... command aliases
-if has('lambda')
+if has('lambda') && exists('##CmdlineEnter')
   augroup RegisterToggleCommands
     autocmd!
     autocmd CmdlineEnter * call RegisterToggleCommands() | autocmd! RegisterToggleCommands
@@ -884,6 +901,25 @@ if has('lambda')
       call CommandAlias(new_cmd, cmd)
     endfor
   endfunction
+endif
+
+" :CloseAllFloatingWindows
+" Closes all floating windows, useful for cleaning up messed up pop-ups
+if has('nvim-0.4.0')
+  command! CloseAllFloatingWindows   lua _G.CloseAllFloatingWindows()
+lua << EOF
+  _G.CloseAllFloatingWindows = function()
+    local closed_windows = {}
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local config = vim.api.nvim_win_get_config(win)
+      if config.relative ~= "" then  -- is_floating_window?
+        vim.api.nvim_win_close(win, false)  -- do not force
+        table.insert(closed_windows, win)
+      end
+    end
+    print(string.format('Closed %d windows: %s', #closed_windows, vim.inspect(closed_windows)))
+  end
+EOF
 endif
 
 " }}}
@@ -914,28 +950,14 @@ function! IsMosh()
   return !empty(l:output)
 endfunction
 
-function! s:auto_termguicolors(...)
-  if !(has('termguicolors'))
-    return
-  endif
-
-  if index(['xterm-256color', 'nvim', 'xterm-kitty', 'builtin_xterm'], &term) >= 0 && !IsMosh()
-    set termguicolors
-  else
-    set notermguicolors
-    silent! set pumblend=0  " disable blending
-  endif
-endfunction
+" Use 24-bit color.
 if has('termguicolors')
-  " by default, enable 24-bit color, but lazily disable if under mosh
+  " Note: We will use GUI colors even if the current session is running under mosh.
+  " Although the stable release does not support 24-bit color yet (see GH-961),
+  " users are expected to use a HEAD version of mosh both on server and client
+  " (e.g., brew install mosh --HEAD,  dotfiles install mosh)
   if !&termguicolors
     set termguicolors
-  endif
-
-  if exists('*timer_start')
-    call timer_start(0, function('s:auto_termguicolors'))
-  else
-    call s:auto_termguicolors()
   endif
 endif
 
@@ -992,14 +1014,14 @@ match ExtraWhitespace /\s\+$/
 augroup trailing_whitespaces
   autocmd!
   autocmd FileType GV,gitmessengerpopup,fugitive highlight clear ExtraWhitespace
-  autocmd BufWinEnter * if s:is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif
-  autocmd InsertEnter * if s:is_file_buffer() | match ExtraWhitespace /\s\+\%#\@<!$/ | endif
-  autocmd InsertLeave * if s:is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif
+  autocmd BufWinEnter * if _is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif
+  autocmd InsertEnter * if _is_file_buffer() | match ExtraWhitespace /\s\+\%#\@<!$/ | endif
+  autocmd InsertLeave * if _is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif
   autocmd BufWinLeave * call clearmatches()
 augroup END
 
-function! s:is_file_buffer() abort
-  return &filetype != '' && &buftype == ''
+function! _is_file_buffer() abort
+  return &filetype != '' && &buftype == '' && &modifiable
 endfunction
 
 
@@ -1094,7 +1116,7 @@ let g:localvimrc_persistent = 2
 " vim-polyglot {{{
 
 " in favor of python-mode and vimtex ...
-let g:polyglot_disabled = ['python', 'python-compiler', 'latex']
+let g:polyglot_disabled = ['python', 'python-indent', 'python-compiler', 'latex']
 
 " ---------------------------------------------------------------- }}}
 " vim-startify {{{
@@ -1235,7 +1257,7 @@ if HasPlug('which-key.nvim')
   autocmd User LazyInit call s:setup_which_key()
 endif
 function! s:setup_which_key()
-lua<<EOF
+lua << EOF
   require("which-key").setup {
     window = {
       border = "single",
@@ -1263,16 +1285,19 @@ let g:EditorConfig_core_mode = 'vim_core'
 " ---------------------------------------------------------------- }}}
 " nvim-notify {{{
 
+let g:nvim_notify_winblend = 20
+
 if IsPlugInstalled('nvim-notify')
   lua function VimNotify(msg, log_level, opts) return vim.notify(msg, log_level, opts) end
   autocmd User LazyInit  call s:setup_nvim_notify()
 endif
 function! s:setup_nvim_notify() abort
-lua<<EOF
+lua << EOF
 require("notify").setup({
   stages = "slide",
   on_open = function(win)
-    vim.api.nvim_win_set_config(win, { focusable = false })  -- see GH-28
+    vim.api.nvim_win_set_config(win, { focusable = false })
+    vim.api.nvim_win_set_option(win, "winblend", vim.g.nvim_notify_winblend)
   end,
   timeout = 5000,
   background_colour = "#000000",
@@ -1302,15 +1327,28 @@ if HasPlug('lualine.nvim')
   autocmd VimEnter * call s:setup_lualine()
 endif
 function! s:setup_lualine() abort
-lua<<EOF
+lua << EOF
 
 -- Customize statusline components
 -- https://github.com/shadmansaleh/lualine.nvim#changing-components-in-lualine-sections
 local custom_components = {
   -- Override 'encoding': Don't display if encoding is UTF-8.
   encoding = function()
-    return [[%{substitute(strlen(&fenc) ? &fenc : &enc, "^utf-8$", "", "")}]]
+    local ret, _ = (vim.bo.fenc or vim.go.enc):gsub("^utf%-8$", "")  -- Note: '-' is a magic character
+    return ret
   end,
+  -- fileformat: Don't display if &ff is unix.
+  fileformat = function()
+    local ret, _ = vim.bo.fileformat:gsub("^unix$", "")
+    return ret
+  end,
+  -- neomake job status
+  neomake_status = function()
+    return table.concat(vim.tbl_values(vim.tbl_map(function(job)
+      if job.exit_code == nil then return '⏳' end
+      return (job.exit_code == 0 and '✅' or '❌')
+    end, vim.g.neomake_job_status or {})))
+  end
 }
 
 require('lualine').setup {
@@ -1319,15 +1357,19 @@ require('lualine').setup {
     theme = 'onedark'
   },
   -- see ~/.dotfiles/vim/plugged/lualine.nvim/lua/lualine/config.lua
+  -- see ~/.dotfiles/vim/plugged/lualine.nvim/lua/lualine/components
   sections = {
     lualine_a = {'mode'},
     lualine_b = {'branch'},
     lualine_c = {
-      {'filename', path = 1}
+      custom_components.neomake_status,
+      {'filename', path = 1},
     },
     lualine_x = {
       'LspStatus()',
-      custom_components.encoding, 'fileformat', 'filetype'
+      { custom_components.encoding,   color = {fg = '#d70000'} },
+      { custom_components.fileformat, color = {fg = '#d70000'} },
+      'filetype'
     },
     lualine_y = {},  -- excludes 'progress'
     lualine_z = {'location'},
@@ -1431,31 +1473,56 @@ let g:airline#extensions#whitespace#mixed_indent_algo = 1
 
 " so that ':Neomake clean' invokes 'make clean'
 let g:neomake_clean_maker = { 'exe': 'make', 'args': ['clean'] }
+let g:neomake_job_status = {}
+
+command! NeomakeNotificationStart    call s:NeomakeNotificationSet(1)
+command! NeomakeNotificationStop     call s:NeomakeNotificationSet(0)
+let g:neomake_job_notification = 0       " notify when success?
+function! s:NeomakeNotificationSet(value) abort
+  let g:neomake_job_notification = a:value
+  call VimNotify((a:value ? "Enabled" : "Disabled") . " notification of successful jobs.",
+        \ "info", {'title': 'Neomake'})
+endfunction
 
 " General hook/callback on starting and finishing jobs {
 function! s:OnNeomakeJobStart()
   " what will we do?
   let l:context = g:neomake_hook_context
+  let g:neomake_job_status[l:context.jobinfo.make_id] = l:context.jobinfo
 endfunction
 
 function! s:OnNeomakeJobFinished()
   let l:context = g:neomake_hook_context
+  let l:job = l:context.jobinfo
+  let l:exit_code = l:job['exit_code']
+
+  " Remove the job from the statusline after 2 seconds
+  if !exists('*timer_start')
+    unlet g:neomake_job_status[l:context.jobinfo.make_id]
+  else
+    call timer_start(2000, { -> execute(printf(
+          \"unlet g:neomake_job_status[%d]", l:context.jobinfo.make_id)) })
+  endif
+
   let l:bufnr = l:context.jobinfo.bufnr
   let l:job_title = printf('Neomake: %s', bufname(l:bufnr))
 
   " If there is any failed job (non-zero exit code), notify it.
   let l:failure_message = ''
-  let l:job = l:context.jobinfo
-  if l:job['exit_code'] != 0
+  if l:exit_code != 0
     let l:failure_message = printf('%s%s ', l:failure_message, l:job['as_string']())
   endif
   if !empty(l:failure_message)
     call VimNotify('Job Failed: ' . l:failure_message, 'warn', {'title': l:job_title})
     copen | wincmd p   " copen, but not move to the quickfix window
-    let b:neomake_auto_copen = 1
+    if !s:is_copen()
+      let b:neomake_auto_copen = 1
+    endif
   else
-    call VimNotify('Job Finished, Success.', 'info',
-          \ {'title': l:job_title, 'timeout': 1000})
+    if g:neomake_job_notification > 0
+      call VimNotify('Job Finished, Success.', 'info',
+            \ {'title': l:job_title, 'timeout': 1000})
+    endif
     if get(b:, 'neomake_auto_copen', 0) == 1
       " if quickfix list is opened automatically by neomake callback,
       " we should automatically close it upon the success of neomake job.
@@ -1465,11 +1532,21 @@ function! s:OnNeomakeJobFinished()
   endif
 endfunction
 
+function! s:is_copen() abort
+  for winnr in range(1, winnr('$'))
+    if getwinvar(winnr, '&syntax') == 'qf'
+      return 1
+    endif
+  endfor
+  return 0
+endfunction
+
 augroup neomake_hooks_common
   au!
   autocmd User NeomakeJobInit     call s:OnNeomakeJobStart()
   autocmd User NeomakeJobFinished call s:OnNeomakeJobFinished()
 augroup END
+
 " }
 
 
@@ -1973,17 +2050,9 @@ endfunction
 function! s:autohide_floaterm() abort
   " Ensure this BufLeave event handler gets executed only once
   autocmd! FloatermAutoHide
-  if &filetype == 'floaterm'
-    " Damn, floaterm keeps changing and breaking things ...
-    " e29e93b2 (2020/8/31): floaterm_winopts -> floaterm_opts
-    " 2b241d7e (2021/1/3):  floaterm_opts -> floaterm_config
-    " 392f3b65 (2021/1/10): No more dict, b:floaterm_wintype, etc. (why such changes?)
-    let l:floaterm_wintype = get(get(b:, 'floaterm_config', get(b:, 'floaterm_opts', {})), 'wintype')
-    if empty(l:floaterm_wintype) | let l:floaterm_wintype = get(b:, 'floaterm_wintype') | endif
-    if l:floaterm_wintype == 'float' || l:floaterm_wintype == 'floating'
-      let l:FuncHide = function('s:floaterm_hide', [bufnr('%')])   " neovim or 7.4.1836+
-      call timer_start(0, { -> l:FuncHide() })
-    endif
+  if &filetype == 'floaterm' && nvim_win_get_config(0).relative != ""
+    let l:FuncHide = function('s:floaterm_hide', [bufnr('%')])   " neovim or 7.4.1836+
+    call timer_start(0, { -> l:FuncHide() })
   endif
 endfunction
 
@@ -2043,8 +2112,6 @@ if IsPlugInstalled('wilder.nvim')
   augroup END
 endif
 function! s:setup_wilder()
-  call wilder#enable_cmdline_enter()
-
   cmap <expr> <Tab>   wilder#in_context() ? wilder#next()     : "\<Tab>"
   cmap <expr> <S-Tab> wilder#in_context() ? wilder#previous() : "\<S-Tab>"
 
@@ -2067,7 +2134,7 @@ function! s:setup_wilder()
         \   'path': {-> getcwd()},
         \ }) : l:pipeline.noop
 
-lua<<EOF
+lua << EOF
 _G._wilder_fuzzy_fd_pipeline_command = function(ctx, arg, file_mode)
   local cmd = {'fd'}
 
@@ -2208,7 +2275,7 @@ function! s:setup_nvimtree() abort
   " Don't ask which window should be picked to open files.
   let g:nvim_tree_disable_window_picker = 1
 
-lua<<EOF
+lua << EOF
   -- Config: https://github.com/kyazdani42/nvim-tree.lua#setup
   local tree_cb = require('nvim-tree.config').nvim_tree_callback
   require('nvim-tree').setup {
@@ -2632,26 +2699,19 @@ endif
 " :Gitsigns
 
 function! s:setup_gitsigns() abort
-lua<<EOF
+lua << EOF
 require('gitsigns').setup {
   signs = {
-    --add          = {hl = 'GitSignsAdd'   , text = '+', numhl='GitSignsAddNr'   , linehl='GitSignsAddLn'},
-    --Change       = {hl = 'GitSignsChange', text = '~', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
-    --delete       = {hl = 'GitSignsDelete', text = '_', numhl='GitSignsDeleteNr', linehl='GitSignsDeleteLn'},
-    --topdelete    = {hl = 'GitSignsDelete', text = '‾', numhl='GitSignsDeleteNr', linehl='GitSignsDeleteLn'},
-    --changedelete = {hl = 'GitSignsChange', text = '~', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
+    -- For highlights, see ~/.vim/colors/xoria256-wook.vim
+    add          = {hl = 'GitSignsAdd'   , text = '┃', numhl='GitSignsAddNr'   , linehl='GitSignsAddLn'},
+    change       = {hl = 'GitSignsChange', text = '┃', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
+    delete       = {hl = 'GitSignsDelete', text = '_', numhl='GitSignsDeleteNr', linehl='GitSignsDeleteLn'},
+    topdelete    = {hl = 'GitSignsDelete', text = '‾', numhl='GitSignsDeleteNr', linehl='GitSignsDeleteLn'},
+    changedelete = {hl = 'GitSignsChange', text = '┃', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
   },
   signcolumn = true,
 }
 EOF
-
-" Manually define (override) signs after calling setup, due to neovim bug 16136
-" For highlights, see ~/.vim/colors/xoria256-wook.vim
-" TODO: This is just a workaround, these will be lost after toggling signs
-sign define GitSignsAdd            text=┃  texthl=GitSignsAdd     numhl=false
-sign define GitSignsChange         text=┃  texthl=GitSignsChange  numhl=false
-sign define GitSignsChangeDelete   text=┃  texthl=GitSignsChange  numhl=false
-
 endfunction
 
 if HasPlug('gitsigns.nvim')
@@ -2691,6 +2751,9 @@ augroup END
 
 " Display content diff as well in the popup window
 let g:git_messenger_include_diff = 'current'
+
+" Use git blame -w (ignore-whitespaces).
+let g:git_messenger_extra_blame_args = '-w'
 
 " ---------------------------------------------------------------- }}}
 " vim-flog {{{

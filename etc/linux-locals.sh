@@ -168,9 +168,10 @@ install_tmux() {
 install_bazel() {
     set -e
 
+    # install the 'latest' stable release (no pre-releases.)
     BAZEL_LATEST_VERSION=$(\
-        curl -L https://api.github.com/repos/bazelbuild/bazel/tags 2>/dev/null | \
-        python -c 'import json, sys; print(json.load(sys.stdin)[0]["name"])'\
+        curl -L https://api.github.com/repos/bazelbuild/bazel/releases/latest 2>/dev/null | \
+        python -c 'import json, sys; print(json.load(sys.stdin)["name"])'\
     )
     test -n $BAZEL_LATEST_VERSION
     BAZEL_VER="${BAZEL_LATEST_VERSION}"
@@ -284,7 +285,7 @@ install_neovim() {
     # install neovim nightly
     set -e
 
-    NEOVIM_VERSION="v0.5.1"
+    NEOVIM_VERSION="v0.6.0"
     VERBOSE=""
     for arg in "$@"; do
       if [ "$arg" == "--nightly" ]; then
@@ -440,6 +441,22 @@ install_lazygit() {
 
   echo -e "\n\n${COLOR_WHITE}$(which lazydocker)${COLOR_NONE}"
   $PREFIX/bin/lazygit --version
+}
+
+install_mosh() {
+  set -e; set -x
+  mkdir -p /tmp/$USER && cd /tmp/$USER/
+  rm -rf mosh || true
+  git clone https://github.com/mobile-shell/mosh --depth=1
+  cd mosh
+
+  # bump up mosh version to indicate this is a HEAD version
+  sed -i -e 's/1\.3\.2/1.4.0/g' configure.ac
+
+  ./autogen.sh
+  ./configure --prefix="$PREFIX"
+  make install
+  $PREFIX/bin/mosh-server --version
 }
 
 install_mujoco() {
