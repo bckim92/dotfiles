@@ -10,6 +10,11 @@ if !filereadable('Makefile')
   endif
 endif
 
+if !exists('g:plugs')
+    " Probably not using the full vimrc/init.vim setup
+    finish
+endif
+
 if has_key(g:plugs, 'neomake')
   " Neomake's python runner only does linting. But we would rather want to run it.
   command! -buffer -bang Neomake  call neomake#ShCommand(<bang>0, &makeprg)
@@ -26,8 +31,7 @@ if exists('*timer_start')
     if !filereadable(l:project_root . '/.pylintrc')
       return -1  " no pylintrc found
     endif
-    if !empty(systemlist("grep", "indent-string='  '",
-          \ (l:project_root . '/.pylintrc')))
+    if !empty(systemlist("grep \"indent-string='  '\" " .. shellescape(l:project_root . '/.pylintrc')))
       setlocal ts=2 sw=2 sts=2
       return 2  " Use tabsize 2
     endif
@@ -82,9 +86,50 @@ if has_key(g:, 'plugs') && !has_key(g:plugs, 'coc.nvim') && has_key(g:plugs, 'je
   inoremap <buffer> <F24>  :call jedi#usages()<CR>
 endif
 
+" comment annotations
+function! ToggleLineComment(str)
+  let l:comment = '# ' . a:str
+  let l:line = getline('.')
+  if l:line =~ (l:comment) . '$'
+    " Already exists at the end: strip the comment
+    call setline('.', TrimRight(l:line[:-(len(l:comment) + 1)]))
+  else
+    " or append it if there wasn't
+    call setline('.', l:line . '  ' . l:comment)
+  end
+endfunction
+
+function! s:define_toggle_mapping(name, comment) abort
+  execute 'nmap <Plug>' . a:name . ' ' .
+        \ ':<C-u>call ToggleLineComment("' . a:comment . '")<CR><bar>' .
+        \ ':<c-u>silent! call repeat#set("\<Plug>' . a:name . '")<CR>'
+endfunction
+call s:define_toggle_mapping("ToggleLineComment_type_ignore", "type: ignore")
+nmap <buffer> <leader>ti <Plug>ToggleLineComment_type_ignore
+call s:define_toggle_mapping("ToggleLineComment_yapf_disable", "yapf: disable")
+nmap <buffer> <leader>ty <Plug>ToggleLineComment_yapf_disable
+
+
 
 " Experimental
 " ============
+
+" LSP: turn on auto formatting by default for a 'project'
+" condition: when one have .style.yapf file in a git repository.
+" Executed only once for the current vim session.
+if exists(':LspAutoFormattingOn')
+  if get(g:, '_python_autoformatting_detected', 0) == 0
+    let g:_python_autoformatting_detected = 1  " do not auto-turn on any more
+    let s:project_root = DetermineProjectRoot()
+    if !empty(s:project_root)
+      let s:style_yapf = s:project_root . '/.style.yapf'
+      if filereadable(s:style_yapf)
+        " TODO: Do not affect files outside the project!!
+        execute ":LspAutoFormattingOn " . s:style_yapf
+      endif
+    endif
+  endif
+endif
 
 " <M-CR> for auto import symbol (replacing coc.nvim)
 if exists(':ImportSymbol')   " plugin vim-autoimport
@@ -98,10 +143,23 @@ if exists(':CocCommand')
 endif
 
 
-function! s:method_on_cursor() abort
-  " try to automatically get the current function
+let b:gps_available = exists('*luaeval') && luaeval(
+            \ 'pcall(require, "nvim-gps") and require"nvim-gps".is_available()'
+            \ )
+
+function! s:test_suite_on_cursor() abort
+  " Automatically extract the current test method or class (suite)
   if has_key(b:, 'lsp_current_function')
     return b:lsp_current_function
+  elseif b:gps_available  " nvim-gps
+    " TODO: This relies on dirty parsing. see nvim-gps#68
+    let loc = split(luaeval('require"nvim-gps".get_location()'))
+    for i in range(len(loc) - 1, 0, -1)
+      if loc[i] =~# '^test' || loc[i] =~# '^Test'
+        return loc[i]
+      endif
+    endfor
+    return ''   " not found
   elseif exists('*CocAction')
     let l:symbol = CocAction('getCurrentFunctionSymbol')
     " coc has a bug where unicode item kind labels appear; strip it
@@ -118,7 +176,7 @@ if has_key(g:plugs, 'vim-floaterm')
     let l:CTRL_U = nr2char(21)
     let l:cmd = ExpandCmd(&makeprg)
     if get(b:, 'makeprg_pytest', 0)
-      let l:pytest_pattern = s:method_on_cursor()
+      let l:pytest_pattern = s:test_suite_on_cursor()
       if !empty(l:pytest_pattern)
         let l:cmd = printf('pytest -s -k %s', shellescape(l:pytest_pattern))
       endif

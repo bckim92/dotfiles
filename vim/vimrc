@@ -139,6 +139,9 @@ set nofoldenable
 " When jumping to line, folds on the line should be opened (:help 'foldopen')
 set foldopen+=jump
 
+" foldcolumn display
+set foldcolumn=auto
+
 " use spaces for tabbing, by default
 set expandtab
 
@@ -276,6 +279,13 @@ endif
 if has('nvim') && executable('nvr')
   let $GIT_EDITOR = 'nvr -cc split --remote-wait'
   autocmd FileType gitcommit set bufhidden=delete
+endif
+
+" python
+if !has('nvim') && !has('python3')
+  autocmd VimEnter * echohl WarningMsg |
+        \ echom 'WARNING: This version of vim is unsupported, lacking +python3. Install vim from brew/apt or use neovim.' |
+        \ echohl None
 endif
 
 " For debugging
@@ -421,6 +431,7 @@ if has('nvim')
 
     " mouse click puts into normal mode even in terminal; disable this
     autocmd TermOpen * tnoremap <buffer><silent> <LeftRelease> <Nop>
+    autocmd TermOpen * tnoremap <buffer><silent> <LeftMouse> <cmd>startinsert<CR>
   augroup END
 
   " terminal in a new tab or vsplit buffer
@@ -792,6 +803,10 @@ else
   endfunction
 endif
 
+function! TrimRight(input_string)
+  return substitute(a:input_string, '\s*$', '\1', '')
+endfunction
+
 function! Echo(msg) abort
   echo a:msg
   return a:msg
@@ -836,6 +851,16 @@ function! WinDo(command) abort
   endtry
 endfunction
 command! -nargs=* WinDo   call WinDo(<q-args>)
+
+" :Q -- close tab
+function! s:Q() abort
+  if tabpagenr('$') == 1
+    qall
+  else
+    tabclose
+  endif
+endfunction
+command! -nargs=0 Q   call s:Q()
 
 " Lua utilities (helpful for debugging)
 if has('nvim-0.5.0')
@@ -1004,8 +1029,11 @@ fun! StripTrailingWhitespaces()
   call cursor(l, c)
 endfun
 
-autocmd FileType c,cpp,java,javascript,html,ruby,python,pandoc
-      \ autocmd BufWritePre <buffer> :call StripTrailingWhitespaces()
+augroup AutoStripTrailingWhitespaces
+  autocmd!
+  autocmd FileType c,cpp,java,javascript,html,ruby,python,pandoc
+        \ autocmd BufWritePre <buffer> :call StripTrailingWhitespaces()
+augroup END
 
 " highlight trailing whitespaces
 highlight ExtraWhitespace ctermbg=red guibg=red
@@ -1047,6 +1075,9 @@ endif
 
 " http://vim.wikia.com/wiki/Identify_the_syntax_highlighting_group_used_at_the_cursor
 function! ShowSyntaxGroup()
+  if exists(':TSHighlightCapturesUnderCursor')
+    :TSHighlightCapturesUnderCursor
+  end
   echo 'hi<' . synIDattr(synID(line('.'),col('.'),1),'name') . '> trans<'
         \ . synIDattr(synID(line('.'),col('.'),0),'name') . '> lo<'
         \ . synIDattr(synIDtrans(synID(line('.'),col('.'),1)),'name') . '>'
@@ -1275,6 +1306,28 @@ hi WhichKeyFloat  guibg=#1a2a3a
 
 
 " ---------------------------------------------------------------- }}}
+" vim-peekaboo {{{
+
+" Use floating window instead of vsplit for peeking registers.
+" https://github.com/junegunn/vim-peekaboo/issues/68
+if has('nvim-0.5.0')
+  let g:peekaboo_window = "call CreateCenteredFloatingWindow()"
+  function! CreateCenteredFloatingWindow()
+    let width = float2nr(&columns * 0.8)
+    let height = float2nr(&lines * 0.7)
+    let top = ((&lines - height) / 2) - 1
+    let left = (&columns - width) / 2
+    let opts = {
+          \ 'relative': 'editor', 'row': top, 'col': left, 'width': width, 'height': height,
+          \ 'style': 'minimal', 'border': 'rounded'}
+
+    call nvim_open_win(nvim_create_buf(v:false, v:true), v:true, opts)
+    setlocal winblend=10
+  endfunction
+endif
+
+
+" ---------------------------------------------------------------- }}}
 " editorconfig {{{
 
 let g:EditorConfig_core_mode = 'vim_core'
@@ -1308,6 +1361,7 @@ require("notify").setup({
 vim.notify = require("notify")
 vim.cmd [[
 command! -nargs=0 NotificationsPrint   :lua require('notify')._print_history()
+command! -nargs=0 PrintNotifications   :NotificationsPrint
 ]]
 EOF
 endfunction
@@ -1329,6 +1383,26 @@ endif
 function! s:setup_lualine() abort
 lua << EOF
 
+-- From nvim-lualine/lualine.nvim/wiki/Component-snippets
+--- @param trunc_width number trunctates component when screen width is less then trunc_width
+--- @param trunc_len number truncates component to trunc_len number of chars
+--- @param hide_width number hides component when window width is smaller then hide_width
+--- @param no_ellipsis boolean whether to disable adding '...' at end after truncation
+--- return function that can format the component accordingly
+local function truncate(trunc_width, trunc_len, hide_width, no_ellipsis)
+  return function(str)
+    local win_width = vim.fn.winwidth(0)
+    if hide_width and win_width < hide_width then return ''
+    elseif trunc_width and trunc_len and win_width < trunc_width and #str > trunc_len then
+      return str:sub(1, trunc_len) .. (no_ellipsis and '' or '...')
+    end
+    return str
+  end
+end
+local function min_window_width(width)
+  return function() return vim.fn.winwidth(0) > width end
+end
+
 -- Customize statusline components
 -- https://github.com/shadmansaleh/lualine.nvim#changing-components-in-lualine-sections
 local custom_components = {
@@ -1348,6 +1422,18 @@ local custom_components = {
       if job.exit_code == nil then return '⏳' end
       return (job.exit_code == 0 and '✅' or '❌')
     end, vim.g.neomake_job_status or {})))
+  end,
+  -- LSP status, with some trim
+  lsp_status = function()
+    return LspStatus()
+  end,
+  -- GPS (https://github.com/SmiteshP/nvim-gps)
+  treesitter_context = function()
+    local ok, gps = pcall(require, "nvim-gps")
+    if ok and gps.is_available() then
+      return gps.get_location()
+    end
+    return ''
   end
 }
 
@@ -1359,20 +1445,27 @@ require('lualine').setup {
   -- see ~/.dotfiles/vim/plugged/lualine.nvim/lua/lualine/config.lua
   -- see ~/.dotfiles/vim/plugged/lualine.nvim/lua/lualine/components
   sections = {
-    lualine_a = {'mode'},
-    lualine_b = {'branch'},
+    lualine_a = {
+      {'mode', cond = min_window_width(40) }
+    },
+    lualine_b = {
+      {'branch', cond = min_window_width(120) }
+    },
     lualine_c = {
       custom_components.neomake_status,
-      {'filename', path = 1},
+      {'filename', path = 1, color = { fg = '#eeeeee' } },
+      custom_components.treesitter_context,
     },
     lualine_x = {
-      'LspStatus()',
+      { custom_components.lsp_status, fmt = truncate(120, 20, 60) },
       { custom_components.encoding,   color = {fg = '#d70000'} },
       { custom_components.fileformat, color = {fg = '#d70000'} },
-      'filetype'
+      {'filetype', cond = min_window_width(120) },
     },
     lualine_y = {},  -- excludes 'progress'
-    lualine_z = {'location'},
+    lualine_z = {
+      {'location', cond = min_window_width(90) },
+    },
   },
   inactive_sections = {
     lualine_a = {},
@@ -1585,8 +1678,13 @@ if has('nvim-0.4')
           \ 'width': width,
           \ 'height': height,
           \ }
+    let winhl = 'Normal:FZFFloatNormal'
+    if has('nvim-0.5')
+      let opts['border'] = 'rounded'
+      let winhl = winhl . ',FloatBorder:FZFFloatNormal'
+    end
     let fwinnr = nvim_open_win(buf, v:true, opts)
-    call setwinvar(fwinnr, '&winhl', 'Normal:FZFFloatNormal')
+    call setwinvar(fwinnr, '&winhl', winhl)
 
     " Additional keymappings on the floating terminal buffer for fzf
     " e.g. make <C-W>{H, J, K, L} work as if it were normal vim windows
@@ -1965,7 +2063,7 @@ nnoremap <leader>FG :Commits<CR>
 nnoremap <leader>FH :History<CR>
 nnoremap <leader>H  :History<CR>
 " :GS -> Git status (open modified file, etc.)
-command! GS GFiles?
+command! GStatus GFiles?
 " :H goes to :History
 command! H History
 
@@ -2116,7 +2214,7 @@ function! s:setup_wilder()
   cmap <expr> <S-Tab> wilder#in_context() ? wilder#previous() : "\<S-Tab>"
 
   " only / and ? are enabled by default
-  call wilder#set_option('modes', ['/', '?', ':'])
+  call wilder#setup({'modes': ['/', '?', ':']})
 
   " pipeline: enable fuzzy command matching, fuzzy file search (GH-101), search history
   let l:pipeline = {}
@@ -2260,7 +2358,99 @@ let NERDTreeIgnore = [
 let NERDTreeRespectWildIgnore = 1   " see wildignore
 
 " ---------------------------------------------------------------- }}}
+" neotree {{{
+
+function! s:setup_neotree() abort
+lua << EOF
+  -- https://github.com/nvim-neo-tree/neo-tree.nvim#quickstart
+  -- ~/.vim/plugged/neo-tree.nvim/lua/neo-tree/defaults.lua
+  require('neo-tree').setup {
+    filesystem = {
+      hijack_netrw_behavior = "open_current",
+      window = {
+        width = 30,
+
+        mappings = {
+          ["r"] = "refresh",
+          ["R"] = "rename",
+          ["I"] = "toggle_hidden",
+          -- Do not reserve default vim keybindings (I want zt, zz, etc.)
+          ["z"] = "none",
+          ["H"] = "none",
+        },
+      },
+
+      -- This is a useful feature to turn on,
+      -- but should be disabled for a workaround until #111 is fixed
+      follow_current_file = false,
+      use_libuv_file_watcher = false,
+
+      -- Append trailing slashes on directories (#112)
+      components = {
+        trailing_slash = function ()
+          return {
+            text = "/",
+            highlight = "NeoTreeDirectoryIcon",
+          }
+        end,
+      },
+      renderers = {
+        directory = {
+          {"icon"},
+          {"name", use_git_status_colors = false},
+          {"trailing_slash"},
+          {"diagnostics"},
+          {"git_status"},
+        }
+      },
+    },
+
+    -- Layout (see #130)
+    default_component_configs = {
+      indent = {
+        with_markers = true,
+        indent_marker = "│",
+        last_indent_marker = "└",
+        indent_size = 2,
+        padding = 0, -- extra padding on the left hand side
+      },
+      icon = {
+        default = "",
+      },
+      git_status = {
+        symbols = {
+          untracked = "?",
+          unstaged = "*",
+          staged = "✚",
+        }
+      },
+    },
+  }
+EOF
+
+endfunction
+
+if has_key(g:plugs, 'neo-tree.nvim')
+  " Use 2.x compatibility mode
+  let g:neo_tree_remove_legacy_commands = 1
+
+  if luaeval('vim.tbl_contains(vim.tbl_map(vim.fn.isdirectory, vim.fn.argv()), 1)')
+    " If any of the startup argument is a directory,
+    " we don't lazy-load neotree so it can hijack netrw.
+    call s:setup_neotree()
+  else
+    autocmd User LazyInit      call s:setup_neotree()
+  endif
+  nmap <leader>E  :Neotree toggle<CR>
+
+  " Highlights
+  hi link NeoTreeDirectoryName Directory
+  hi NeoTreeGitUntracked guifg=#E3DB88
+endif
+
+" ---------------------------------------------------------------- }}}
 " nvim-tree.lua {{{
+" DEPRECATED: Use neo-tree.nvim instead.
 
 function! s:setup_nvimtree() abort
   " Ignore some files
@@ -2387,6 +2577,51 @@ let g:scrollview_mode = 'virtual'
 let g:scrollview_excluded_filetypes = ['vim-plug', 'GV', 'git']
 
 " ---------------------------------------------------------------- }}}
+" pretty-fold {{{
+
+autocmd User LazyInit  call s:setup_prettyfold()
+function! s:setup_prettyfold() abort
+lua << EOF
+  -- Configuration
+  -- https://github.com/anuvyklack/pretty-fold.nvim#foldtext-configuration
+  local number_of_folded_lines = function()
+    return string.format('%3d lines', vim.v.foldend - vim.v.foldstart + 1)
+  end
+  local rep_fill_char = function(times)
+    return function(config) return config.fill_char:rep(times) end
+  end
+  require("pretty-fold").setup {
+    fill_char = '╶',
+    sections = {
+      left = {
+        'content',
+      },
+      right = {
+         ' ', 'number_of_folded_lines', ' ', rep_fill_char(3),
+      }
+    },
+    process_comment_signs = false,
+  }
+
+  -- Preview closed folds
+  -- https://github.com/anuvyklack/pretty-fold.nvim#preview
+  -- Note: help 'foldopen' to specify when fold will be opened upon actions
+  require('pretty-fold.preview').setup {
+    border = 'single',
+
+    -- Disable default keybindings (h/l) which are confusing. Use `zp` instead
+    key = false,
+  }
+
+  _G.PreviewFold = function()
+    require('pretty-fold.preview').show_preview()
+  end
+EOF
+  command! -nargs=0 PreviewFold :lua _G.PreviewFold()
+  nnoremap zp <cmd>PreviewFold<CR>
+endfunction
+
+" ---------------------------------------------------------------- }}}
 " UltiSnips {{{
 let g:UltiSnipsExpandTrigger = '<c-j>'
 let g:UltiSnipsJumpForwardTrigger = '<c-j>'
@@ -2442,6 +2677,8 @@ let g:semshi#error_sign = 0
 
 " ---------------------------------------------------------------- }}}
 " ALE {{{
+" Note: This ALE configuration is legacy, and is not used any more
+" in favor of builtin LSP and null-ls.nvim)
 
 " Specify linters.
 " You may find the configuration file for each linter engine useful.
@@ -2610,6 +2847,8 @@ augroup END
 " ---------------------------------------------------------------- }}}
 " fugitive {{{
 
+let g:fugitive_legacy_commands = 0
+
 " Custom Fugitive Commands
 " GitThreeWayDiff: open a 3-way diff window among {HEAD, index, working copy}
 command! GitThreeWayDiff        call GitThreeWayDiff()
@@ -2622,6 +2861,18 @@ function! GitThreeWayDiff() abort
   call win_gotoid(current_win)  " [right]  working copy
 endfunction
 
+" command aliases
+command! -nargs=* GCommit :Git commit -v<args>
+
+" Remove or replace some fugitive commands
+augroup FugitiveCustomizeCommands
+  autocmd CmdlineEnter * ++once silent delcommand GDelete
+
+ " :G -> :GDiff + :Git
+  autocmd CmdlineEnter * ++once command! -nargs=0 G
+        \ execute 'GDiff' | execute 'Git'
+
+augroup END
 
 " fugitive key mappings
 nnoremap <leader>gd :Gvdiff<CR>
@@ -2635,8 +2886,6 @@ endfunction
 nnoremap <leader>gci :Git commit --verbose<CR>
 nnoremap <leader>gcA :Git commit --amend --verbose<CR>
 
-command! -nargs=* GC :Git commit -v<args>
-
 " on commit, type 'cA' to enter in amend mode
 au FileType gitcommit nnoremap <buffer> <silent>
             \ cA :bd<CR>:<C-U>Git commit --verbose --amend<CR>
@@ -2644,8 +2893,8 @@ au FileType gitcommit nnoremap <buffer> <silent>
 " Git: more configuration and keymaps for fugitive index buffers
 augroup FugitiveAddon
   autocmd!
-  " Fix window height to be 20
-  autocmd FileType fugitive    if !&winfixheight | resize 20 | setlocal winfixheight | endif
+  " Fix window height to be 16
+  autocmd FileType fugitive    if !&winfixheight | resize 16 | setlocal winfixheight | endif
 
   " [?] show help  / [ci] commit -v
   autocmd FileType fugitive    nnoremap <buffer> <silent> ?  :<C-u>vertical help fugitive-maps<CR>:wincmd p<CR>
@@ -2710,18 +2959,49 @@ require('gitsigns').setup {
     changedelete = {hl = 'GitSignsChange', text = '┃', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
   },
   signcolumn = true,
+  current_line_blame_opts = {
+    delay = 150,
+    virt_text_pos = 'right_align',
+    ignore_whitespace = true,
+  },
+  on_attach = function(bufnr)
+    local function map(mode, lhs, rhs, opts)
+      opts = vim.tbl_extend('force', {noremap = true, silent = true}, opts or {})
+      vim.api.nvim_buf_set_keymap(bufnr, mode, lhs, rhs, opts)
+    end
+    -- Navigation
+    map('n', ']c', "&diff ? ']c' : '<cmd>Gitsigns next_hunk<CR>'", {expr=true})
+    map('n', '[c', "&diff ? '[c' : '<cmd>Gitsigns prev_hunk<CR>'", {expr=true})
+    -- Actions
+    map('n', '<leader>hs', '<cmd>Gitsigns stage_hunk<CR>')
+    map('n', '<leader>hr', '<cmd>Gitsigns reset_hunk<CR>')
+    map('v', '<leader>hs', '<cmd>Gitsigns stage_hunk<CR>')
+    map('v', '<leader>hr', '<cmd>Gitsigns reset_hunk<CR>')
+    map('n', '<leader>hS', '<cmd>Gitsigns stage_buffer<CR>')
+    map('n', '<leader>hu', '<cmd>Gitsigns undo_stage_hunk<CR>')
+    map('n', '<leader>hR', '<cmd>Gitsigns reset_buffer<CR>')
+    map('n', '<leader>hp', '<cmd>Gitsigns preview_hunk<CR>')
+    map('n', '<leader>hb', '<cmd>lua require"gitsigns".blame_line {full=true, ignore_whitespace=true}<CR>')
+    map('n', '<leader>tb', '<cmd>Gitsigns toggle_current_line_blame<CR>')
+    map('n', '<leader>hd', '<cmd>Gitsigns diffthis<CR>')                    -- Diff against stage
+    map('n', '<leader>hD', '<cmd>lua require"gitsigns".diffthis("~")<CR>')  -- Diff against HEAD
+    map('n', '<leader>td', '<cmd>Gitsigns toggle_deleted<CR>')
+    -- Text object
+    map('o', 'ih', ':<C-U>Gitsigns select_hunk<CR>')
+    map('x', 'ih', ':<C-U>Gitsigns select_hunk<CR>')
+
+    -- Additional keymappings (actions) other than the suggested defaults
+    map('n', '<leader>ha', '<cmd>Gitsigns stage_hunk<CR>')
+    map('v', '<leader>ha', '<cmd>Gitsigns stage_hunk<CR>')
+    map('n', '<leader>hh', '<cmd>Gitsigns toggle_linehl<CR>')
+    map('n', '<leader>hw', '<cmd>Gitsigns toggle_word_diff<CR>')
+  end
 }
 EOF
 endfunction
 
 if HasPlug('gitsigns.nvim')
   autocmd User LazyInit  call s:setup_gitsigns()
-
-  " Additional keymappings other than the defaults
-  nmap <leader>ha  <cmd>lua require"gitsigns".stage_hunk()<CR>
-  nmap <leader>hm  <cmd>lua require"gitsigns".blame_line(true)<CR>
-  nmap <leader>hh  <cmd>Gitsigns toggle_linehl<CR>
-  nmap <leader>hw  <cmd>Gitsigns toggle_word_diff<CR>
 endif
 
 " ---------------------------------------------------------------- }}}
@@ -2769,14 +3049,52 @@ let g:flog_permanent_default_arguments = {
 hi flogHash  guifg=#ffd43b
 
 " ---------------------------------------------------------------- }}}
+" diffview.nvim {{{
+" Assumed fugitive is always available.
+
+if IsPlugInstalled('diffview.nvim')
+lua << EOF
+  require('diffview').setup {
+    default_args = {
+      DiffviewOpen = { '--untracked-files=no' },
+    }
+  }
+EOF
+  " :GHistory <files>
+  command! -nargs=* -complete=file GHistory   DiffviewFileHistory <args>
+  " :GDiff <revision>     to HEAD
+  command! -nargs=* -complete=customlist,DiffviewCmdCompletion  GDiff  DiffviewOpen <args>
+  " :GShow <revision>
+  command! -nargs=+ -complete=customlist,DiffviewCmdCompletion  GShow  DiffviewOpen <args>^1..<args>
+
+  " cmd completion functions for aliased commands.
+  function DiffviewCmdCompletion(argLead, cmdLine, curPos)
+    return luaeval("require'diffview'.completion("
+          \ . "vim.fn.eval('a:argLead'),"
+          \ . "vim.fn.eval('a:cmdLine'),"
+          \ . "vim.fn.eval('a:curPos'))")
+  endfunction
+lua << EOF
+  local completers = require('diffview').completers
+  completers.GDiff = completers.DiffviewOpen
+  completers.GShow = completers.DiffviewOpen
+EOF
+endif
+
+" ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{
 let g:gundo_right = 1   " show at right
 let g:gundo_prefer_python3  = 1
 nnoremap <leader>G :GundoToggle<CR>
 
 " ---------------------------------------------------------------- }}}
-" tagbar key mappings {{{
+" tagbar {{{
+
 nnoremap <leader>T :TagbarToggle<CR>
+
+" Do not display visibility symbols (+, -, ...) which are not pretty.
+let g:tagbar_show_visibility = 0
+
 
 " ---------------------------------------------------------------- }}}
 " coc.nvim (language server completion) {{{
@@ -2785,7 +3103,6 @@ if has_key(g:plugs, 'coc.nvim')
 
   " For general settings, try :CocConfig
   " (or ~/.config/nvim/coc-settings.json)
-  au BufRead coc-settings.json    set ft=jsonc
 
   " Appearance and highlight groups  (see also: NormalFloat)
   highlight CocFloating       ctermbg=236 guibg=#292c3a

@@ -16,7 +16,8 @@ endif
 
 let s:_python3_version = ''
 function! s:python3_version()
-  if has('nvim')           | return g:python3_host_version
+  if has('nvim')
+    return get(g:, 'python3_host_version', '')
   elseif has('python3')
     if empty(s:_python3_version)
       let s:_python3_version = join(py3eval('sys.version_info'), ".")
@@ -43,7 +44,7 @@ Plug 'dstein64/vim-startuptime', { 'on': ['StartupTime'] }
 
 " Vim Interfaces
 " -------------------------------------
-if has('nvim-0.5.0')
+if has('nvim-0.6.0')
   " Status line: use lualine.nvim (fork)
   Plug 'nvim-lualine/lualine.nvim'
   ForcePlugURI 'lualine.nvim'
@@ -99,6 +100,9 @@ if has('nvim-0.5.0')
 else
   Plug 'airblade/vim-gitgutter'
 endif
+if has('nvim-0.5.0')
+  Plug 'sindrets/diffview.nvim'
+endif
 if has('nvim-0.4.0') && exists('*nvim_open_win')
   " git blame with floating window (requires nvim 0.4.0+)
   Plug 'rhysd/git-messenger.vim'
@@ -115,6 +119,9 @@ endif
 if exists('##WinScrolled')  " neovim nightly (0.5.0+)
   Plug 'dstein64/nvim-scrollview'
 endif
+if has('nvim-0.5.0')
+  Plug 'anuvyklack/pretty-fold.nvim'
+end
 
 " Miscellanious Utilities
 " -------------------------------------
@@ -150,7 +157,8 @@ Plug 'MarcWeber/vim-addon-mw-utils'
 Plug 'tpope/vim-eunuch'
 Plug 'wookayin/vim-typora', { 'on': 'Typora' }
 if has('nvim-0.5.0')
-  Plug 'folke/which-key.nvim'
+  Plug 'wookayin/which-key.nvim'
+  ForcePlugURI 'which-key.nvim'    " See GH-227
 endif
 
 if s:darwin && isdirectory('/Applications/Dash.app')
@@ -166,9 +174,18 @@ if has('nvim-0.5.0')
   " Some lua-powered plugins for neovim 0.5.0+
   Plug 'rcarriga/nvim-notify'
   Plug 'norcalli/nvim-colorizer.lua'
-  Plug 'kyazdani42/nvim-tree.lua'
+  Plug 'nvim-neo-tree/neo-tree.nvim', {'branch': 'main'}
+  Plug 'MunifTanjim/nui.nvim'
   Plug 'nvim-lua/plenary.nvim'
   Plug 'nvim-telescope/telescope.nvim', PinIf(!has('nvim-0.6.0'), '80cdb00')
+endif
+
+if has('nvim-0.6.1')
+  " Treesitter (see ~/.config/nvim/lua/config/treesitter.lua)
+  Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+  Plug 'nvim-treesitter/playground', {'as': 'nvim-treesitter-playground'}
+
+  Plug 'SmiteshP/nvim-gps'
 endif
 
 " Syntax, Completion, Language Servers, etc.
@@ -217,11 +234,6 @@ function! s:choose_completion_backend()
 endfunction
 let g:dotfiles_completion_backend = s:choose_completion_backend()
 
-" Asynchronous Lint Engine (ALE): seems orthogonal to backend
-if has('nvim') || v:version >= 800
-  Plug 'w0rp/ale'
-endif
-
 " 1. [Neovim 0.5.0 LSP]
 " See also for more config: ~/.config/nvim/lua/config/lsp.lua
 if g:dotfiles_completion_backend == '@lsp'
@@ -234,19 +246,21 @@ if g:dotfiles_completion_backend == '@lsp'
   Plug 'hrsh7th/cmp-nvim-lsp'
   Plug 'hrsh7th/cmp-path'
   Plug 'quangnguyen30192/cmp-nvim-ultisnips'
-  Plug 'lukas-reineke/cmp-under-comparator'
 
   Plug 'ray-x/lsp_signature.nvim'
   Plug 'nvim-lua/lsp-status.nvim', PinIf(!has('nvim-0.6.0'), 'e8e5303')
+  Plug 'j-hui/fidget.nvim', PlugCond(has('nvim-0.6.0'))
   Plug 'folke/trouble.nvim'
   Plug 'kyazdani42/nvim-web-devicons'
   Plug 'onsails/lspkind-nvim'
 
-  UnPlug 'ervandew/supertab'   " Custom <TAB> mapping for coc.nvim supercedes supertab
-  UnPlug 'w0rp/ale'            " Disable ALE for now (TODO: we might still need it for LSP-lacking filetypes)
+  Plug 'jose-elias-alvarez/null-ls.nvim', PlugCond(has('nvim-0.6.0'))
+
 endif
 
 " 2. [coc.nvim]
+" Note: coc.nvim is not tested since my migration to nvim-lsp,
+" so it may not work properly with the recent versions of nvim and coc.
 if g:dotfiles_completion_backend == '@coc'
   Plug 'neoclide/coc.nvim', {'branch': 'release'}
   Plug 'neoclide/jsonc.vim'
@@ -261,9 +275,13 @@ if g:dotfiles_completion_backend == '@coc'
 
   " automatically install CocExtensions by default
   let g:coc_global_extensions = [
-        \ 'coc-json', 'coc-highlight', 'coc-snippets', 'coc-explorer',
-        \ 'coc-python', 'coc-vimlsp', 'coc-texlab'
+        \ 'coc-json', 'coc-highlight', 'coc-explorer',
+        \ 'coc-vimlsp', 'coc-texlab',
         \ ]
+  if has('python3')
+    let g:coc_global_extensions += [
+        \ 'coc-python', 'coc-snippets']
+  endif
 
   UnPlug 'kyazdani42/nvim-tree.lua'   " use coc-explorer
 endif
@@ -274,6 +292,8 @@ if g:dotfiles_completion_backend == ''
   Plug 'davidhalter/jedi-vim'
   " Legacy support for <TAB> in the completion context
   Plug 'ervandew/supertab'
+  " Use ALE if no LSP support was used
+  Plug 'w0rp/ale', PlugCond(v:version >= 800)
   " echodoc: not needed for coc.nvim and nvim-lsp
   if has('nvim')
     Plug 'Shougo/echodoc.vim'
@@ -282,8 +302,10 @@ endif
 
 " Other language-specific plugins supplementary and orthogonal to LSP, coc, etc.
 " ------------------------------------------------------------------------------
-Plug 'klen/python-mode', { 'branch': 'develop' }
-Plug 'wookayin/vim-python-enhanced-syntax'
+if has('python3')
+  Plug 'klen/python-mode', { 'branch': 'develop' }
+  Plug 'wookayin/vim-python-enhanced-syntax'
+endif
 
 " polyglot: cannot use latest version (see GH-608, GH-613)
 Plug 'sheerun/vim-polyglot', {'tag': 'v4.2.1'}

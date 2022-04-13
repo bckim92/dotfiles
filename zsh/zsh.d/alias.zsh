@@ -49,9 +49,14 @@ alias v='vim'
 
 # Just open ~/.vimrc, ~/.zshrc, etc.
 alias vimrc='vim +"cd ~/.dotfiles" +Vimrc +tabclose\ 1'
-#alias vimrc='vim +cd\ ~/.vim -O ~/.vim/vimrc ~/.vim/plugins.vim'
+alias plugs='vim +"cd ~/.dotfiles" ~/.dotfiles/vim/plugins.vim'
 
 alias zshrc='vim +cd\ ~/.zsh -O ~/.zsh/zshrc ~/.zsh/zsh.d/alias.zsh'
+
+function plugged() {
+    [ -z "$1" ] && { echo "plugged: args required"; return 1; }
+    cd "$HOME/.vim/plugged/$1"
+}
 
 # Tmux ========================================= {{{
 
@@ -116,6 +121,8 @@ compdef '_hosts' ssh-tmuxa
 
 GIT_VERSION=$(git --version | awk '{print $3}')
 
+alias github='\gh'
+
 alias gh='git history'
 alias ghA='gh --all'
 if _version_check $GIT_VERSION "2.0"; then
@@ -129,6 +136,7 @@ alias gdc='gd --cached --no-prefix'
 alias gds='gd --staged --no-prefix'
 alias gs='git status'
 alias gsu='gs -u'
+alias gu='git pull --autostash'
 
 function ghad() {
   # Run gha (git history) and refresh if anything in .git/ changes
@@ -353,6 +361,11 @@ rgfzf () {
 # Etc ======================================= {{{
 
 alias iterm-tab-color="noglob iterm-tab-color"
+
+if (( $+commands[http-server] )); then
+    # Disable cache for the http server.
+    alias http-server="http-server -c-1"
+fi
 
 if (( $+commands[pydf] )); then
     # pip install --user pydf

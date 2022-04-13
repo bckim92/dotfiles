@@ -131,7 +131,7 @@ install_node() {
 install_tmux() {
     # install tmux (and its dependencies such as libevent) locally
     set -e
-    TMUX_VER="2.4"
+    TMUX_VER="3.2a"
 
     TMP_TMUX_DIR="/tmp/$USER/tmux/"; mkdir -p $TMP_TMUX_DIR
 
@@ -282,11 +282,16 @@ install_vim() {
 }
 
 install_neovim() {
-    # install neovim nightly
+    # install neovim stable or nightly
     set -e
 
-    NEOVIM_VERSION="v0.6.0"
-    VERBOSE=""
+    local NEOVIM_VERSION=$(\
+        curl -L https://api.github.com/repos/neovim/neovim/releases/latest 2>/dev/null | \
+        python -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])'\
+    )   # starts with "v", e.g. "v0.6.1"
+    test -n "$NEOVIM_VERSION"
+
+    local VERBOSE=""
     for arg in "$@"; do
       if [ "$arg" == "--nightly" ]; then
         NEOVIM_VERSION="nightly";
@@ -303,8 +308,8 @@ install_neovim() {
     fi
     sleep 1;  # allow users to read above comments
 
-    TMP_NVIM_DIR="/tmp/$USER/neovim"; mkdir -p $TMP_NVIM_DIR
-    NVIM_DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/${NEOVIM_VERSION}/nvim-linux64.tar.gz"
+    local TMP_NVIM_DIR="/tmp/$USER/neovim"; mkdir -p $TMP_NVIM_DIR
+    local NVIM_DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/${NEOVIM_VERSION}/nvim-linux64.tar.gz"
 
     cd $TMP_NVIM_DIR
     wget --backups=1 $NVIM_DOWNLOAD_URL      # always overwrite, having only one backup
@@ -340,8 +345,10 @@ install_fd() {
     # install fd
     set -e
 
+    local FD_VERSION="v8.3.2"
+
     TMP_FD_DIR="/tmp/$USER/fd"; mkdir -p $TMP_FD_DIR
-    FD_DOWNLOAD_URL="https://github.com/sharkdp/fd/releases/download/v6.0.0/fd-v6.0.0-x86_64-unknown-linux-musl.tar.gz"
+    FD_DOWNLOAD_URL="https://github.com/sharkdp/fd/releases/download/${FD_VERSION}/fd-${FD_VERSION}-x86_64-unknown-linux-musl.tar.gz"
     echo $FD_DOWNLOAD_URL
 
     cd $TMP_FD_DIR
@@ -441,6 +448,21 @@ install_lazygit() {
 
   echo -e "\n\n${COLOR_WHITE}$(which lazydocker)${COLOR_NONE}"
   $PREFIX/bin/lazygit --version
+}
+
+install_rsync() {
+  set -e
+
+  local URL="https://rsync.samba.org/ftp/rsync/rsync-3.2.3.tar.gz"
+  local TMP_DIR="/tmp/$USER/rsync"; mkdir -p $TMP_DIR
+
+  wget -N -O $TMP_DIR/rsync.tar.gz "$URL"
+  tar -xvzf $TMP_DIR/rsync.tar.gz -C $TMP_DIR --strip-components 1
+  cd $TMP_DIR
+
+  ./configure --prefix="$PREFIX"
+  make install
+  $PREFIX/bin/rsync --version
 }
 
 install_mosh() {
