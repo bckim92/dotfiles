@@ -51,6 +51,9 @@ endsnippet
 snippet utf8
 # -*- coding: utf-8 -*-
 endsnippet
+snippet future
+from __future__ import annotations
+endsnippet
 
 
 ################################################################################
@@ -209,6 +212,11 @@ snippet rich.traceback
 import rich.traceback; rich.traceback.install(width=None, show_locals=True)
 endsnippet
 
+# temp files
+snippet tmpdir
+tempfile.mkdtemp(suffix=None)
+endsnippet
+
 # misc utilities
 snippet strftime
 time.strftime(${1:'%Y%m%d-%H%M%S'})
@@ -229,7 +237,7 @@ endsnippet
 # Logging
 ################################################################################
 snippet p
-print($1)
+print(f"{$1=}")
 endsnippet
 snippet log
 log.info($1)

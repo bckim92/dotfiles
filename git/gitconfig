@@ -41,6 +41,7 @@
 	list-conflicts = diff --name-only --diff-filter=U
 
 	amend = commit --amend -v
+	amend-f = commit --amend -v --no-edit
 
 	wdiff = diff --color-words
 	wshow = show --color-words
@@ -81,6 +82,10 @@
 	new = green
 	whitespace = red reverse
 	meta = yellow bold
+
+[commit]
+	# git commit --verbose by default (git 2.9.0+)
+	verbose = true
 
 [diff]
 	# --no-prefix (for git diff, git show) such as 'a/' 'b/' blah
@@ -130,6 +135,10 @@
 [branch]
 	# Make all new branches to automatically use rebase rather than merge, on pull
 	autosetuprebase = always
+
+[stash]
+	# Show diff when running 'git stash show <SHA>'.
+	showPatch = true
 
 [submodule]
 	# Git 2.15+: Update submodules recursively when pulling changes

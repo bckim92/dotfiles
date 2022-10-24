@@ -1,3 +1,9 @@
+"-------------
+" plugins.vim
+"-------------
+
+" Utilities and Helpers {{{
+
 runtime autoload/plug_addon.vim
 
 let s:darwin = has('mac')
@@ -14,22 +20,13 @@ if has('nvim')
   endfunction
 endif
 
-let s:_python3_version = ''
-function! s:python3_version()
-  if has('nvim')
-    return get(g:, 'python3_host_version', '')
-  elseif has('python3')
-    if empty(s:_python3_version)
-      let s:_python3_version = join(py3eval('sys.version_info'), ".")
-    endif
-    return s:_python3_version
-  else | return ''
-  endif
-endfunction
+" python version check
+let s:has_py35 = has('python3') && py3eval('sys.version_info >= (3, 5)')
 
 " Detect (neo)vim features
 let s:floating_available = exists('*nvim_open_win') &&
       \ (exists('##MenuPopupChanged') || exists('##CompleteChanged'))
+" }}}
 
 "==============================================
 call plug#begin('~/.vim/plugged')
@@ -44,7 +41,7 @@ Plug 'dstein64/vim-startuptime', { 'on': ['StartupTime'] }
 
 " Vim Interfaces
 " -------------------------------------
-if has('nvim-0.6.0')
+if has('nvim')
   " Status line: use lualine.nvim (fork)
   Plug 'nvim-lualine/lualine.nvim'
   ForcePlugURI 'lualine.nvim'
@@ -56,10 +53,8 @@ endif
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all --no-update-rc' }
 Plug 'junegunn/fzf.vim'
 Plug 'wookayin/fzf-ripgrep.vim'
-if has('nvim-0.4.0')
+if has('nvim') || has('popup')
   Plug 'voldikss/vim-floaterm'
-endif
-if has('nvim-0.4.0') || has('popup')
   Plug 'skywind3000/vim-quickui'
 endif
 if exists('##TermOpen') || exists('##TerminalOpen')
@@ -76,7 +71,7 @@ Plug 'tpope/vim-dispatch', { 'tag' : 'v1.1' }
 if has('nvim') || v:version >= 800
   Plug 'neomake/neomake'
 endif
-if has('nvim-0.4.0')
+if has('nvim')
   Plug 'gelguy/wilder.nvim', { 'do': function('UpdateRemote') }
   Plug 'romgrk/fzy-lua-native'
 endif
@@ -95,32 +90,32 @@ Plug 'tmux-plugins/vim-tmux-focus-events'
 Plug 'tpope/vim-fugitive'
 Plug 'junegunn/gv.vim'
 Plug 'rbong/vim-flog'
-if has('nvim-0.5.0')
+if has('nvim')
   Plug 'lewis6991/gitsigns.nvim'
 else
   Plug 'airblade/vim-gitgutter'
 endif
-if has('nvim-0.5.0')
+if has('nvim')
   Plug 'sindrets/diffview.nvim'
-endif
-if has('nvim-0.4.0') && exists('*nvim_open_win')
-  " git blame with floating window (requires nvim 0.4.0+)
   Plug 'rhysd/git-messenger.vim'
 endif
 Plug 'majutsushi/tagbar'
 Plug 'rking/ag.vim'
 Plug 'kshenoy/vim-signature'
 Plug 'junegunn/vim-easy-align'
-if has('nvim-0.5.0')
+if has('nvim')
   Plug 'lukas-reineke/indent-blankline.nvim'
 else
   Plug 'Yggdroot/indentLine'
 endif
-if exists('##WinScrolled')  " neovim nightly (0.5.0+)
+if exists('##WinScrolled')
   Plug 'dstein64/nvim-scrollview'
 endif
-if has('nvim-0.5.0')
-  Plug 'anuvyklack/pretty-fold.nvim'
+
+" Advanced Folding
+if has('nvim')
+  Plug 'kevinhwang91/nvim-ufo'
+  Plug 'kevinhwang91/promise-async'
 end
 
 " Miscellanious Utilities
@@ -147,7 +142,7 @@ endif
 Plug 'scrooloose/nerdcommenter'
 Plug 'junegunn/vim-peekaboo'
 Plug 'sjl/gundo.vim'
-if has('python3') && s:python3_version() >= '3.5'
+if has('python3') && s:has_py35
   Plug 'SirVer/ultisnips'
 endif
 Plug 'vim-scripts/matchit.zip'
@@ -156,13 +151,12 @@ Plug 'junegunn/vader.vim'
 Plug 'MarcWeber/vim-addon-mw-utils'
 Plug 'tpope/vim-eunuch'
 Plug 'wookayin/vim-typora', { 'on': 'Typora' }
-if has('nvim-0.5.0')
-  Plug 'wookayin/which-key.nvim'
-  ForcePlugURI 'which-key.nvim'    " See GH-227
+if has('nvim')
+  Plug 'folke/which-key.nvim'
 endif
 
 if s:darwin && isdirectory('/Applications/Dash.app')
-  if has('nvim-0.5.0')
+  if has('nvim')
     Plug 'mrjones2014/dash.nvim', { 'do': 'make install',
           \ 'on': ['Dash', 'DashWord'] }
   else
@@ -170,138 +164,76 @@ if s:darwin && isdirectory('/Applications/Dash.app')
   endif
 endif
 
-if has('nvim-0.5.0')
-  " Some lua-powered plugins for neovim 0.5.0+
+if has('nvim')
+  " Some lua-powered plugins for UI
+  Plug 'nvim-lua/plenary.nvim'
   Plug 'rcarriga/nvim-notify'
   Plug 'norcalli/nvim-colorizer.lua'
   Plug 'nvim-neo-tree/neo-tree.nvim', {'branch': 'main'}
   Plug 'MunifTanjim/nui.nvim'
-  Plug 'nvim-lua/plenary.nvim'
-  Plug 'nvim-telescope/telescope.nvim', PinIf(!has('nvim-0.6.0'), '80cdb00')
+  Plug 'stevearc/dressing.nvim'
+
+  Plug 'nvim-telescope/telescope.nvim'
 endif
 
-if has('nvim-0.6.1')
-  " Treesitter (see ~/.config/nvim/lua/config/treesitter.lua)
-  Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+" Treesitter (see ~/.config/nvim/lua/config/treesitter.lua)
+if has('nvim')
+  function! TSUpdate(arg) abort
+    if luaeval('pcall(require, "nvim-treesitter")')
+      TSUpdate
+    endif
+  endfunction
+
+  let g:_plug_ts_config = {'do': function('TSUpdate')}
+  if !has('nvim-0.8')
+    " Since 42ab95d5, nvim 0.8.0+ is required
+    let g:_plug_ts_config['commit'] = '4cccb6f4'
+  endif
+  Plug 'nvim-treesitter/nvim-treesitter', g:_plug_ts_config
   Plug 'nvim-treesitter/playground', {'as': 'nvim-treesitter-playground'}
 
   Plug 'SmiteshP/nvim-gps'
 endif
 
+" Test integration
+if has('nvim')
+  Plug 'nvim-neotest/neotest'
+  Plug 'antoinemadec/FixCursorHold.nvim'
+
+  Plug 'nvim-neotest/neotest-python'
+  Plug 'nvim-neotest/neotest-plenary'
+endif
+
 " Syntax, Completion, Language Servers, etc.
 " ------------------------------------------
 
-Plug 'editorconfig/editorconfig-vim'
-
-" [Completion Engine or LSP backend]
-" We have a long history and I want to make completion work for legacy and
-" older vim as well. Choose the completion or LSP engine in the order of
-" preferred and up-to-date technology with a fallback manner.
-" (Read g:dotfiles_completion_backend to see which one has been chosen)
-function! s:choose_completion_backend()
-  " 1. Neovim 0.5.0+: built-in LSP
-  if has('nvim-0.5.0')
-    return '@lsp'
-  endif
-
-  " 2. Neovim 0.4.0+ or vim 8.0.1453+: coc.nvim
-  "   (i) Proper neovim/vim8 version and python3
-  "   (ii) 'node' and 'npm' are installed
-  "   (iii) Directory ~/.config/coc exists (opt-in)
-  if (has('nvim-0.4.0') || (!has('nvim') && has('patch-8.0.1453'))) &&
-        \ executable('npm') && executable('python3') &&
-        \ isdirectory(expand("\~/.config/coc/"))
-    " Check minimum node version
-    let node_version = system('node --version')
-    if !plug_addon#version_lessthan(node_version, 'v8.10')
-      return '@coc'
-    else
-      autocmd VimEnter * echohl WarningMsg | echom
-            \ 'WARNING: Node v8.10.0+ is required for coc.nvim. '
-            \ . '(Try: dotfiles install node)' | echohl None
-    endif
-  endif
-
-  " (At this point, apparently we are maybe using legacy (neo)vim. Warn users!)
-  if has('nvim') && !has('nvim-0.4.0')
-    autocmd VimEnter * echohl WarningMsg | echom
-          \ 'WARNING: Neovim version is too old. Please install latest neovim (0.5.1+). '
-          \ . '(Try: dotfiles install neovim)' | echohl None
-  endif
-
-  " No completion available :(
-  return ''
-endfunction
-let g:dotfiles_completion_backend = s:choose_completion_backend()
-
-" 1. [Neovim 0.5.0 LSP]
+" Neovim LSP related plugins.
 " See also for more config: ~/.config/nvim/lua/config/lsp.lua
-if g:dotfiles_completion_backend == '@lsp'
+if has('nvim')
   Plug 'neovim/nvim-lspconfig'
   Plug 'williamboman/nvim-lsp-installer'
-  Plug 'folke/lua-dev.nvim'
+  Plug 'folke/neodev.nvim'
 
-  Plug 'hrsh7th/nvim-cmp'
+  Plug 'hrsh7th/nvim-cmp', {'commit': 'dbc7229'}  " GH-899
   Plug 'hrsh7th/cmp-buffer'
   Plug 'hrsh7th/cmp-nvim-lsp'
   Plug 'hrsh7th/cmp-path'
   Plug 'quangnguyen30192/cmp-nvim-ultisnips'
 
   Plug 'ray-x/lsp_signature.nvim'
-  Plug 'nvim-lua/lsp-status.nvim', PinIf(!has('nvim-0.6.0'), 'e8e5303')
-  Plug 'j-hui/fidget.nvim', PlugCond(has('nvim-0.6.0'))
+  Plug 'nvim-lua/lsp-status.nvim'
+  Plug 'j-hui/fidget.nvim'
   Plug 'folke/trouble.nvim'
   Plug 'kyazdani42/nvim-web-devicons'
   Plug 'onsails/lspkind-nvim'
 
-  Plug 'jose-elias-alvarez/null-ls.nvim', PlugCond(has('nvim-0.6.0'))
-
+  Plug 'jose-elias-alvarez/null-ls.nvim'
 endif
 
-" 2. [coc.nvim]
-" Note: coc.nvim is not tested since my migration to nvim-lsp,
-" so it may not work properly with the recent versions of nvim and coc.
-if g:dotfiles_completion_backend == '@coc'
-  Plug 'neoclide/coc.nvim', {'branch': 'release'}
-  Plug 'neoclide/jsonc.vim'
-  if has('nvim-0.4.0')
-    Plug 'antoinemadec/coc-fzf'
-  endif
+" Other language-specific plugins (supplementary and orthogonal to LSP)
+" ---------------------------------------------------------------------
+Plug 'editorconfig/editorconfig-vim'
 
-  if s:floating_available
-    " disable vim-which-key if floating windows are used (have some conflicts)
-    UnPlug 'liuchengxu/vim-which-key'
-  endif
-
-  " automatically install CocExtensions by default
-  let g:coc_global_extensions = [
-        \ 'coc-json', 'coc-highlight', 'coc-explorer',
-        \ 'coc-vimlsp', 'coc-texlab',
-        \ ]
-  if has('python3')
-    let g:coc_global_extensions += [
-        \ 'coc-python', 'coc-snippets']
-  endif
-
-  UnPlug 'kyazdani42/nvim-tree.lua'   " use coc-explorer
-endif
-
-" no LSP/coc support (legacy)
-if g:dotfiles_completion_backend == ''
-  " Use jedi-vim, only if we are not using coc.nvim or LSP.
-  Plug 'davidhalter/jedi-vim'
-  " Legacy support for <TAB> in the completion context
-  Plug 'ervandew/supertab'
-  " Use ALE if no LSP support was used
-  Plug 'w0rp/ale', PlugCond(v:version >= 800)
-  " echodoc: not needed for coc.nvim and nvim-lsp
-  if has('nvim')
-    Plug 'Shougo/echodoc.vim'
-  endif
-endif
-
-" Other language-specific plugins supplementary and orthogonal to LSP, coc, etc.
-" ------------------------------------------------------------------------------
 if has('python3')
   Plug 'klen/python-mode', { 'branch': 'develop' }
   Plug 'wookayin/vim-python-enhanced-syntax'
@@ -312,7 +244,7 @@ Plug 'sheerun/vim-polyglot', {'tag': 'v4.2.1'}
 Plug 'tmux-plugins/vim-tmux'
 Plug 'fladson/vim-kitty', { 'for': ['kitty'] }
 
-if has('nvim') && s:python3_version() >= '3.5'
+if has('nvim') && s:has_py35
   " Semshi is no longer being maintained. Use my own fork
   Plug 'wookayin/semshi', { 'do': function('UpdateRemote') }
   ForcePlugURI 'semshi'
@@ -339,10 +271,19 @@ endif
 
 call plug#end()
 
+" Cleanup {{{
 delcom UnPlug
 delcom ForcePlugURI
 silent delfunction PlugCond
 silent delfunction PinIf
 silent unlet g:_nerdtree_lazy_events
+" }}}
 
-" vim: set ts=2 sts=2 sw=2:
+
+" Automatically install missing plugins on startup
+let g:plugs_missing_on_startup = filter(values(g:plugs), '!isdirectory(v:val.dir)')
+if len(g:plugs_missing_on_startup) > 0
+  PlugInstall --sync | q
+endif
+
+" vim: set ts=2 sts=2 sw=2 foldenable foldmethod=marker:

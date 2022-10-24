@@ -9,10 +9,11 @@ _version_check() {
 # -----------------------------
 
 # Basic
-alias reload!="command -v zgen 2>&1 > /dev/null && zgen reset; \
+alias reload!="command -v antidote 2>&1 > /dev/null && antidote reset; \
     source ~/.zshrc && echo 'sourced ~/.zshrc' again"
 alias c='command'
 alias ZQ='exit'
+alias QQ='exit'
 
 alias cp='nocorrect cp -iv'
 alias mv='nocorrect mv -iv'
@@ -251,14 +252,14 @@ function pip-search() {
 }
 
 # PREFIX/bin/python -> PREFIX/bin/ipython, etc.
-alias ipdb='${$(which python)%/*}/ipdb'
-alias pudb='${$(which python)%/*}/pudb3'
-alias pudb3='${$(which python)%/*}/pudb3'
+alias ipdb='python -m ipdb'
+alias pudb='python -m pudb'
+alias pudb3='pudb'
 alias python-config='${$(which python)%/*}/python3-config'
 alias python3-config='${$(which python)%/*}/python3-config'
 
 # ipython
-alias ipython='${$(which python)%/*}/ipython'
+alias ipython='python -m IPython'
 alias ipy='ipython'
 alias ipypdb='ipy -c "%pdb" -i'   # with auto pdb calling turned ON
 
@@ -268,8 +269,8 @@ alias jupyter='${$(which python)%/*}/jupyter'
 alias jupyter-lab='${$(which python)%/*}/jupyter-lab --no-browser'
 
 # ptpython
-alias ptpython='${$(which python)%/*}/ptpython'
-alias ptipython='${$(which python)%/*}/ptipython'
+alias ptpython='python -m ptpython'
+alias ptipython='python -m ptpython.entry_points.run_ptipython'
 alias ptpy='ptipython'
 alias pt='ptpy'
 
@@ -377,8 +378,13 @@ function site-packages() {
     # print the path to the site packages from current python environment,
     # e.g. ~/.anaconda3/envs/XXX/lib/python3.6/site-packages/
 
-    python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
-    # python -c "import site; print('\n'.join(site.getsitepackages()))"
+    local base=$(python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")
+    if [[ -n "$1" ]] && [[ ! -d "$base/$1" ]]; then
+        echo "Does not exist: $base/$1" >&2;
+        return 1
+    else
+        echo "$base/$1"
+    fi;
 }
 
 function vimpy() {
@@ -386,10 +392,13 @@ function vimpy() {
     # e.g. $ vimpy numpy.core    --> opens $(site-package)/numpy/core/__init__.py
     if [[ -z "$1" ]]; then; echo "Argument required"; return 1; fi
 
-    local _module_path=$(python -c "import $1; print($1.__file__)")
-    if [[ -n "$module_path" ]]; then
-      echo $module_path
-      vim "$module_path"
+    local _module_path=$(python -c "import $1; print($1.__file__)" 2>/dev/null)
+    if [[ -n "$_module_path" ]]; then
+        echo $_module_path
+        vim "$_module_path"
+     else
+        echo "Cannot import module: $1"
+        return 1;
     fi
 }
 

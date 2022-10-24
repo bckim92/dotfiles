@@ -20,8 +20,8 @@ parser.add_argument('-f', '--force', action="store_true", default=False,
                     help='If set, it will override existing symbolic links')
 parser.add_argument('--skip-vimplug', action='store_true',
                     help='If set, do not update vim plugins.')
-parser.add_argument('--skip-zgen', '--skip-zplug', action='store_true',
-                    help='If set, skip zgen updates.')
+parser.add_argument('--skip-zplug', action='store_true',
+                    help='If set, skip update of zsh plugins.')
 
 args = parser.parse_args()
 
@@ -47,7 +47,6 @@ tasks = {
     '~/.gitignore' : 'git/gitignore',
 
     # ZSH
-    '~/.zgen'     : 'zsh/zgen',
     '~/.zsh'      : 'zsh',
     '~/.zlogin'   : 'zsh/zlogin',
     '~/.zlogout'  : 'zsh/zlogout',
@@ -90,17 +89,16 @@ tasks = {
 }
 
 
-try:
-    from distutils.spawn import find_executable
-except ImportError:
-    # In some environments, distutils might not be available.
-    import sys
-    sys.stderr.write("WARNING: distutils not available\n")
-    find_executable = lambda _: False   # type: ignore
+import os
+import platform
+
+# Make sure the CWD is the root of dotfiles.
+__PATH__ = os.path.abspath(os.path.dirname(__file__))
+os.chdir(__PATH__)
 
 
 post_actions = []
-post_actions += [
+post_actions += [  # Check symbolic link at $HOME
     '''#!/bin/bash
     # Check whether ~/.vim and ~/.zsh are well-configured
     for f in ~/.vim ~/.zsh ~/.vimrc ~/.zshrc; do
@@ -116,7 +114,7 @@ Please remove your local folder/file $f and try again.\033[0m"
     done
 ''']
 
-post_actions += [
+post_actions += [  # video2gif
     '''#!/bin/bash
     # Download command line scripts
     mkdir -p "$HOME/.local/bin/"
@@ -129,42 +127,27 @@ post_actions += [
     exit $ret;
 ''']
 
-post_actions += [
+post_actions += [  # antidote (zsh plugins)
     '''#!/bin/bash
-    # Update zgen modules and cache (the init file)
+    # Update zsh bundles and cache (the init file)
     zsh -c "
-        # source zplug and list plugins
+        # source zsh plugin manager and list plugins
         DOTFILES_UPDATE=1 __p9k_instant_prompt_disabled=1 source ${HOME}/.zshrc
-        if ! which zgen > /dev/null; then
+        if ! which antidote > /dev/null; then
             echo -e '\033[0;31m\
-ERROR: zgen not found. Double check the submodule exists, and you have a valid ~/.zshrc!\033[0m'
-            ls -alh ~/.zsh/zgen/
+ERROR: antidote not found. Double check the submodule exists, and you have a valid ~/.zshrc!\033[0m'
+            ls -alh ~/.zsh/antidote/
             ls -alh ~/.zshrc
             exit 1;
         fi
-        zgen reset
-        zgen update
+        antidote update
+        antidote reset
     "
-    ''' if not args.skip_zgen else \
-        '# zgen update (Skipped)'
+    ''' if not args.skip_zplug else \
+        '# zsh plugins update (Skipped)'
 ]
 
-post_actions += [
-    '''#!/bin/bash
-    # validate neovim package installation on python2/3 and automatically install if missing
-    bash "etc/install-neovim-py.sh"
-''']
-
-vim = 'nvim' if find_executable('nvim') else 'vim'
-post_actions += [
-    # Run vim-plug installation
-    {'install' : '{vim} +PlugInstall +qall'.format(vim=vim),
-     'update'  : '{vim} +PlugUpdate  +qall'.format(vim=vim),
-     'none'    : '# {vim} +PlugUpdate (Skipped)'.format(vim=vim)
-     }['update' if not args.skip_vimplug else 'none']
-]
-
-post_actions += [
+post_actions += [  # tmux plugins
     # Install tmux plugins via tpm
     '~/.tmux/plugins/tpm/bin/install_plugins',
 
@@ -173,7 +156,11 @@ post_actions += [
     _version_check() {    # target_ver current_ver
         [ "$1" = "$(echo -e "$1\n$2" | sort -s -t- -k 2,2n | sort -t. -s -k 1,1n -k 2,2n | head -n1)" ]
     }
-    if ! _version_check "2.3" "$(tmux -V | cut -d' ' -f2)"; then
+    if [[ `uname` == "Linux" ]] && ! type tmux >/dev/null 2>&1; then
+        echo -e "\033[0;33mInstalling tmux because not installed globally.\033[0m"
+        bin/dotfiles install tmux
+        export PATH="$PATH:~/.local/bin"
+    elif ! _version_check "2.3" "$(tmux -V | cut -d' ' -f2)"; then
         echo -en "\033[0;33m"
         echo -e "$(tmux -V) is too old. Contact system administrator, or:"
         echo -e "  $ dotfiles install tmux  \033[0m (installs to ~/.local/, if you don't have sudo)"
@@ -183,25 +170,7 @@ post_actions += [
     fi
 ''']
 
-post_actions += [
-    r'''#!/bin/bash
-    # Setting up for coc.nvim (~/.config/coc, node.js)
-
-    # (i) create ~/.config/coc directory if not exists
-    GREEN="\033[0;32m"; YELLOW="\033[0;33m"; RESET="\033[0m";
-    coc_dir="$HOME/.config/coc/"
-    if [ ! -d "$coc_dir" ]; then
-        mkdir -p "$coc_dir" || exit 1;
-        echo "Created: $coc_dir"
-    else
-        echo -e "${GREEN}coc directory:${RESET}   $coc_dir"
-    fi
-
-    # (ii) validate or auto-install node.js locally
-    bash "etc/install-node.sh" || exit 1;
-''']
-
-post_actions += [
+post_actions += [  # default shell
     r'''#!/bin/bash
     # Change default shell to zsh
     /bin/zsh --version >/dev/null || (\
@@ -214,7 +183,7 @@ post_actions += [
     fi
 ''']
 
-post_actions += [
+post_actions += [  # gitconfig.secret
     r'''#!/bin/bash
     # Create ~/.gitconfig.secret file and check user configuration
     if [ ! -f ~/.gitconfig.secret ]; then
@@ -245,6 +214,30 @@ EOL
     echo -en 'user.email : '; git config --file ~/.gitconfig.secret user.email
     echo -en '\033[0m';
 ''']
+
+post_actions += [  # install some essential packages (linux)
+    '''#!/bin/bash
+    # Install node, rg, fd locally
+    export PATH="$PATH:$HOME/.local/bin"
+    type node >/dev/null 2>&1 || bin/dotfiles install node
+    type rg   >/dev/null 2>&1 || bin/dotfiles install ripgrep
+    type fd   >/dev/null 2>&1 || bin/dotfiles install fd
+    '''
+] if platform.system() == "Linux" else []
+
+post_actions += [  # neovim
+    '''#!/bin/bash
+    # validate neovim package installation on python2/3 and automatically install if missing
+    bash "etc/install-neovim-py.sh"
+''']
+
+post_actions += [  # vim-plug
+    # Run vim-plug installation
+    {'install' : 'PATH="$PATH:~/.local/bin"  nvim --headless +"set nonumber" +"PlugInstall --sync" +%print +UpdateRemotePlugins +qall',
+     'update'  : 'PATH="$PATH:~/.local/bin"  nvim --headless +"set nonumber" +"PlugUpdate  --sync" +%print +UpdateRemotePlugins +qall',
+     'none'    : '# nvim +PlugUpdate (Skipped)',
+     }['update' if not args.skip_vimplug else 'none']
+]
 
 ################# END OF FIXME #################
 
@@ -368,8 +361,9 @@ for target, source in sorted(tasks.items()):
     # make a symbolic link if available
     if not os.path.lexists(target):
         mkdir_target = os.path.split(target)[0]
-        makedirs(mkdir_target, exist_ok=True)
-        log(GREEN('Created directory : %s' % mkdir_target))
+        if not os.path.isdir(mkdir_target):
+            makedirs(mkdir_target)
+            log(GREEN('Created directory : %s' % mkdir_target))
         os.symlink(source, target)
         log("{:50s} : {}".format(
             BLUE(target),

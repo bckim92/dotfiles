@@ -21,8 +21,14 @@ fi
 # Editors
 #
 
-export EDITOR='vim'
-export VISUAL='vim'
+if (( $+commands[nvim] )); then
+  export EDITOR='nvim'
+  export VISUAL='nvim'
+else
+  export EDITOR='vim'
+  export VISUAL='vim'
+fi
+
 export PAGER='less'
 
 #
@@ -75,6 +81,18 @@ fi
 # Node + Yarn
 if [ -d $HOME/.yarn/bin/ ]; then
   path=( $path $HOME/.yarn/bin )
+fi
+
+# Ruby on macos (M1)
+# Homebrew ruby is keg-only, no symlink into /opt/homebrew/bin,
+# so we'll need manually add ruby and gem bins to PATH
+# NOTE: We hvae to pin an exact ruby version (brew install ruby@3.0)
+if [[ "$OSTYPE" == darwin* && "$(uname -m)" == "arm64" ]]; then
+  path=(
+    "/opt/homebrew/opt/ruby@3.0/bin"
+    "/opt/homebrew/lib/ruby/gems/3.0.0/bin"
+    $path
+  )
 fi
 
 # Cleanup some anaconda environment variables to avoid messing up in tmux, etc.
@@ -149,6 +167,8 @@ fpath=(${ZDOTDIR:-$HOME}/.zsh/prezto-themes ~/.zsh/functions ~/.local/share/zsh/
 #
 # Python - Virtualenv, etc.
 #
+
+export PYTHONBREAKPOINT='pudb.set_trace'
 
 if [[ "$(uname)" == "Darwin" ]]; then
     # Mac OS X: use python shipped by Homebrew for virtualenv.
