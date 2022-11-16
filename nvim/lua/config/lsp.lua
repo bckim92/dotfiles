@@ -29,7 +29,11 @@ local on_attach = function(client, bufnr)
   -- [[ A callback executed when LSP engine attaches to a buffer. ]]
 
   -- Always use signcolumn for the current buffer
-  vim.wo.signcolumn = 'yes:1'
+  if vim.bo.filetype == 'python' then
+    vim.wo.signcolumn = 'yes:2'
+  else
+    vim.wo.signcolumn = 'yes:1'
+  end
 
   -- Activate LSP signature on attach.
   on_attach_lsp_signature(client, bufnr)
@@ -66,7 +70,7 @@ local on_attach = function(client, bufnr)
   --buf_set_keymap('n', '<space>wr', '<cmd>lua vim.lsp.buf.remove_workspace_folder()<CR>', opts)
   --buf_set_keymap('n', '<space>wl', '<cmd>lua print(vim.inspect(vim.lsp.buf.list_workspace_folders()))<CR>', opts)
   buf_set_keymap('n', '<leader>rn', '<cmd>lua vim.lsp.buf.rename()<CR>', opts)
-  --buf_set_keymap('n', '<space>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
+  buf_set_keymap('n', '<leader>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
   --buf_set_keymap('n', '<space>e', '<cmd>lua vim.lsp.diagnostic.show_line_diagnostics()<CR>', opts)
   --buf_set_keymap('n', '<space>q', '<cmd>lua vim.lsp.diagnostic.set_loclist()<CR>', opts)
   --buf_set_keymap("n", "<space>f", "<cmd>lua vim.lsp.buf.formatting()<CR>", opts)
@@ -92,8 +96,8 @@ do
     imap <F3>   <F12>
 
     " Shift+F12: show usages/references
-    map  <F24>  gr
-    imap <F24>  <ESC>gr
+    map  <S-F12>  gr
+    imap <S-F12>  <ESC>gr
   ]]
 end
 
@@ -131,7 +135,19 @@ _G.lsp_setup_opts['sumneko_lua'] = {
         version = 'LuaJIT',   -- Lua 5.1/LuaJIT
       },
       completion = { callSnippet = "Disable" },
-      workspace = { maxPreload = 8000 },
+      workspace = {
+        maxPreload = 8000,
+        -- Add additional paths for lua packages
+        library = (function()
+          local library = {}
+          if vim.fn.has('mac') > 0 then
+            -- http://www.hammerspoon.org/Spoons/EmmyLua.html
+            -- Add a line `hs.loadSpoon('EmmyLua')` on the top in ~/.hammerspoon/init.lua
+            library[string.format('%s/.hammerspoon/Spoons/EmmyLua.spoon/annotations', os.getenv 'HOME')] = true
+          end
+          return library
+        end)(),
+      },
     },
   },
 }
@@ -208,7 +224,8 @@ if vim.diagnostic then
     },
     float = {
       source = 'always',
-      focusable = false, -- See neovim#16425
+      focusable = true,
+      focus = false,
       border = 'single',
 
       -- Customize how diagnostic message will be shown: show error code.
@@ -671,6 +688,10 @@ if pcall(require, "null-ls") then
               },
             }),
         })),
+      -- @rust
+      _cond("rustfmt", null_ls.builtins.formatting.rustfmt.with {
+        extra_args = { "--edition=2018" }
+      }),
     },
 
     should_attach = function(bufnr)
@@ -729,7 +750,10 @@ if pcall(require, "null-ls") then
       return false
     end
     -- TODO: Enable only on the current project specified by PATH.
-    if vim.tbl_count(vim.lsp.buf_get_clients(0)) > 0 then
+    local formatting_clients = vim.tbl_filter(function(client)
+      return client.server_capabilities.documentFormattingProvider
+    end, vim.lsp.get_active_clients({bufnr = 0}))
+    if vim.tbl_count(formatting_clients) > 0 then
       vim.lsp.buf.format({ timeout_ms = 2000 })
       return true
     end

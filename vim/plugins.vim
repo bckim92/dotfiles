@@ -67,10 +67,14 @@ Plug 'jistr/vim-nerdtree-tabs', { 'on': g:_nerdtree_lazy_events }
 Plug 'Xuyuanp/nerdtree-git-plugin'
 
 Plug 'vim-voom/VOoM', { 'on' : ['Voom', 'VoomToggle'] }
-Plug 'tpope/vim-dispatch', { 'tag' : 'v1.1' }
+if has('nvim')
+   Plug 'kevinhwang91/nvim-bqf'
+endif
 if has('nvim') || v:version >= 800
   Plug 'neomake/neomake'
+  Plug 'skywind3000/asyncrun.vim'
 endif
+Plug 'vim-scripts/errormarker.vim'
 if has('nvim')
   Plug 'gelguy/wilder.nvim', { 'do': function('UpdateRemote') }
   Plug 'romgrk/fzy-lua-native'
@@ -281,7 +285,7 @@ silent unlet g:_nerdtree_lazy_events
 
 
 " Automatically install missing plugins on startup
-let g:plugs_missing_on_startup = filter(values(g:plugs), '!isdirectory(v:val.dir)')
+let g:plugs_missing_on_startup = filter(values(g:plugs), '!isdirectory(v:val.dir) && !empty(get(v:val, "uri"))')
 if len(g:plugs_missing_on_startup) > 0
   PlugInstall --sync | q
 endif

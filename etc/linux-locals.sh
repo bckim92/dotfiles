@@ -174,30 +174,22 @@ install_bazel() {
     echo ""
 }
 
-install_anaconda() {
-    # installs Anaconda-python3. (Deprecated: Use miniconda)
-    # https://www.anaconda.com/products/individual
-    # https://repo.anaconda.com/archive/Anaconda3-2021.05-Linux-x86_64.sh
+install_miniforge() {
+    # Miniforge3.
+    # https://github.com/conda-forge/miniforge
     set -e
-    ANACONDA_VERSION="2021.05"
+    local URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
 
-    if [ "$1" != "--force" ]; then
-        echo "Please use miniconda instead. Use --force option to proceed." && exit 1;
-    fi
+    local TMP_DIR="/tmp/$USER/miniforge/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
+    wget -nc "$URL"
 
-    # https://www.anaconda.com/download/
-    TMP_DIR="/tmp/$USER/anaconda/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
-    wget -nc "https://repo.anaconda.com/archive/Anaconda3-${ANACONDA_VERSION}-Linux-x86_64.sh"
-
-    # will install at $HOME/.anaconda3 (see zsh config for PATH)
-    ANACONDA_PREFIX="$HOME/.anaconda3/"
-    bash "Anaconda3-${ANACONDA_VERSION}-Linux-x86_64.sh" -b -p ${ANACONDA_PREFIX}
-
-    $ANACONDA_PREFIX/bin/python --version
+    local MINIFORGE_PREFIX="$HOME/.miniforge3"
+    bash "Miniforge3-Linux-x86_64.sh" -b -p ${MINIFORGE_PREFIX}
+    $MINIFORGE_PREFIX/bin/python3 --version
 }
 
 install_miniconda() {
-    # installs Miniconda3
+    # installs Miniconda3. (Deprecated: Use miniforge3)
     # https://conda.io/miniconda.html
     set -e
     MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
@@ -304,26 +296,27 @@ install_neovim() {
 
 install_exa() {
     # https://github.com/ogham/exa/releases
-    EXA_VERSION="0.9.0"
-    EXA_BINARY_SHA1SUM="744e3fdff6581bf84b95cecb00258df8c993dc74"  # exa-linux-x86_64 v0.9.0
-    EXA_DOWNLOAD_URL="https://github.com/ogham/exa/releases/download/v$EXA_VERSION/exa-linux-x86_64-$EXA_VERSION.zip"
+    EXA_VERSION="0.10.1"
+    EXA_BINARY_SHA1SUM="7bbd4be0bf44a0302970e7596f5753a0f31e85ac"
+    EXA_DOWNLOAD_URL="https://github.com/ogham/exa/releases/download/v$EXA_VERSION/exa-linux-x86_64-v$EXA_VERSION.zip"
     TMP_EXA_DIR="/tmp/$USER/exa/"
 
     wget -nc ${EXA_DOWNLOAD_URL} -P ${TMP_EXA_DIR} || exit 1;
-    cd ${TMP_EXA_DIR} && unzip -o "exa-linux-x86_64-$EXA_VERSION.zip" || exit 1;
-    if [[ "$EXA_BINARY_SHA1SUM" != "$(sha1sum exa-linux-x86_64 | cut -d' ' -f1)" ]]; then
+    cd ${TMP_EXA_DIR} && unzip -o "exa-linux-x86_64-v$EXA_VERSION.zip" || exit 1;
+    if [[ "$EXA_BINARY_SHA1SUM" != "$(sha1sum bin/exa | cut -d' ' -f1)" ]]; then
         echo -e "${COLOR_RED}SHA1 checksum mismatch, aborting!${COLOR_NONE}"
         exit 1;
     fi
-    cp "exa-linux-x86_64" "$PREFIX/bin/exa" || exit 1;
+    cp "bin/exa" "$PREFIX/bin/exa" || exit 1;
+    cp "completions/exa.zsh" "$PREFIX/share/zsh/site-functions/_exa" || exit 1;
     echo "$(which exa) : $(exa --version)"
 }
 
 install_fd() {
     # install fd
+    # https://github.com/sharkdp/fd/releases
     set -e
-
-    local FD_VERSION="v8.3.2"
+    local FD_VERSION="v8.5.3"
 
     TMP_FD_DIR="/tmp/$USER/fd"; mkdir -p $TMP_FD_DIR
     FD_DOWNLOAD_URL="https://github.com/sharkdp/fd/releases/download/${FD_VERSION}/fd-${FD_VERSION}-x86_64-unknown-linux-musl.tar.gz"
@@ -375,7 +368,8 @@ install_xsv() {
 }
 
 install_bat() {
-    BAT_VERSION="0.12.1"
+    # https://github.com/sharkdp/bat/releases
+    local BAT_VERSION="0.22.1"
 
     set -e; set -x
     mkdir -p $PREFIX/bin && cd $PREFIX/bin
@@ -460,11 +454,12 @@ install_mosh() {
 }
 
 install_mujoco() {
-  # https://mujoco.org/download
+  # https://github.com/deepmind/mujoco/
+  # Note: If pre-built wheel is available, just do `pip install mujoco` and it's done
   set -e; set -x
-  local mujoco_version="mujoco210"
+  local mujoco_version="2.3.0"
 
-  local MUJOCO_ROOT=$HOME/.mujoco/$mujoco_version
+  local MUJOCO_ROOT=$HOME/.mujoco/mujoco-$mujoco_version
   if [[ -d "$MUJOCO_ROOT" ]]; then
     echo -e "${COLOR_YELLOW}Error: $MUJOCO_ROOT already exists.${COLOR_NONE}"
     return 1;
@@ -474,12 +469,12 @@ install_mujoco() {
   mkdir -p $tmpdir && cd $tmpdir
   mkdir -p $HOME/.mujoco
 
-  local download_url="https://mujoco.org/download/${mujoco_version}-linux-x86_64.tar.gz"
+  local download_url="https://github.com/deepmind/mujoco/releases/download/${mujoco_version}/mujoco-${mujoco_version}-linux-x86_64.tar.gz"
   local filename="$(basename $download_url)"
   wget -N -O $tmpdir/$filename "$download_url"
   tar -xvzf "$filename" -C $tmpdir
 
-  mv $tmpdir/$mujoco_version $HOME/.mujoco/
+  mv $tmpdir/mujoco-$mujoco_version $HOME/.mujoco/
   test -d $MUJOCO_ROOT
 
   $MUJOCO_ROOT/bin/testspeed $MUJOCO_ROOT/model/scene.xml 1000

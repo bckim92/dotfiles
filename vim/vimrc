@@ -254,14 +254,20 @@ set matchpairs+=<:>
 " or open a new buffer by splitting window in the current tab otherwise.
 set switchbuf+=usetab,split
 
-" diff: ignore whitespaces
-if &diff
+" diff options (&diffopt)
+try
+  " Ignore whitespaces
   set diffopt+=iwhite
-  " use more intuitive, semantically easy-to-parse diff algorithm
-  if has("patch-8.1.0360") || has('nvim')
+  " Use more intuitive, semantically easy-to-parse diff algorithm
+  if has('patch-8.1.0360') || has('nvim')
     set diffopt+=internal,algorithm:patience
   endif
-endif
+  " Enhance diff result by line matching algorithm (neovim#14537)
+  if has('nvim-0.9.0')
+    set diffopt+=linematch:60
+  endif
+catch   " ignore if diffopt unknown for legacy vimdiff
+endtry
 
 " jump to the last position when reopening a file
 if has('autocmd')
@@ -287,6 +293,10 @@ if has('nvim')
 endif
 
 " Use nvr as git editor (inside neovim terminal)
+" nvr >= 2.5.0 required.
+" One exception: on a floaterm, nvr should not be used. However,
+" floaterm does not allow customization of environment variables.
+" As a workaround, we unset $GIT_EDITOR in ~/.zshenv.
 if has('nvim') && executable('nvr')
   let $GIT_EDITOR = 'nvr -cc split --remote-wait'
   autocmd FileType gitcommit set bufhidden=delete
@@ -539,53 +549,64 @@ vnoremap > >gv
 nnoremap [l :lprevious<CR>
 nnoremap ]l :lnext<CR>
 
-" -----------------------
-" [F5] Make and Build {{{
-" -----------------------
-" use Make (vim-dispatch) or Neomake (neomake)
-if has_key(g:plugs, 'neomake')
-    " neomake; always use the bang version so that :copen can sync
-    command! -nargs=0 -bang TheMake cexpr [] | Neomake!
-    command! -nargs=0 TheCopen copen
-else
-    " vim-dispatch
-    command! -nargs=0 -bang TheMake Make<bang>
-    command! -nargs=0 TheCopen Copen
-endif
+" ------------------
+" Make and Build {{{
+" ------------------
+" We use <F5> and <Ctrl-F5> to quickly build and execute the code.
+" <C-F5> :Build        => Build and run the program.
+" <F5>   :Debug        => Build and run, in a debug mode (with DAP in the future) if available.
+" <F6>   :Output       => Show the output or build status window (quickfix, terminal, etc.)
 
+" To specialize project-wise, filetype-wise, or buffer-wise behaviors,
+" the Build, Debug, and Output commands be overriden.
+" However, we should NOT directly remap <F5> and <Ctrl-F5>.
 
-" smartly dispatch according to filetype
-command! -nargs=0 -bang RunMake call s:run_make("<bang>")
-function! s:run_make(bang)
-    let l:silent_filetypes = ['tex', 'pandoc', 'lilypond']
-    " (1) bang given, force background
-    if a:bang ==# '!' | TheMake!
-    " (2) for specified filetypes, use background
-    elseif index(l:silent_filetypes, &filetype) >= 0 | TheMake!
-    " (3) otherwise, make with foreground shown
-    else | TheMake
-    endif
-    echo printf(':RunMake  (%s)', &makeprg)
+" For now, <F5> runs :Debug -> :Build -> :Make.
+nmap <F5>    <cmd>silent w<CR><cmd>Debug<CR>
+nmap <C-F5>  <cmd>silent w<CR><cmd>Build<CR>
+imap <F5>    <ESC><F5>a
+imap <C-F5>  <ESC><C-F5>a
+
+" Alternative to <F5> (shortcut)
+map <leader>m <F5>
+
+" Build commands default to Make
+command! -nargs=* -bar Build    Make
+command! -nargs=* -bar Debug    Build
+
+" :Make
+" The default behavior is to run :Neomake, which runs a &makeprg job silently in the background.
+"
+" Note that filetype plugins or individual buffers may override the command :Make
+" For instance, ~/.vim/after/ftplugin/python.vim  ~/.vim/after/ftplugin/cpp.vim
+"
+command! -nargs=* -complete=customlist,MakeCommandCompletion -bar Make
+      \ call s:run_make("<bang>", <q-args>)
+function! s:run_make(bang, qargs)
+    " Asynchronous job dispatching in the background (output goes to quickfix)
+    exec 'AsyncMake ' . a:qargs
+    echohl Special
+    echom 'Make: ' . &makeprg
+    echohl NONE
 endfunction
 
-" A handy way to set makeprg.
-command! -nargs=1 Makeprg let &g:makeprg="<args>" | echo "makeprg = <args>"
+" Completion for :Make commands
+function! MakeCommandCompletion(A, L, P) abort
+  if &makeprg == 'make'
+    " credit: @pbnj https://dev.to/pbnj/how-to-get-make-target-tab-completion-in-vim-4mj1
+    let l:targets = systemlist('make -qp | awk -F'':'' ''/^[a-zA-Z0-9][^$#\/\t=]*:([^=]|$)/ {split($1,A,/ /);for(i in A)print A[i]}'' | grep -v Makefile | sort -u')
+    return filter(l:targets, 'v:val =~ "^' . a:A . '"')
+  else
+    return []
+  end
+endfunction
 
-if has_key(g:plugs, 'vim-dispatch')
-    " use vim-dispatch if exists
+" A handy way to set (global) makeprg.
+" See ~/.dotfiles/nvim/lua/config/commands/Makeprg.lua for nvim+lua version
+command! -nargs=1 Makeprg       let &makeprg="<args>" | echo "&makeprg = <args>"
+command! -nargs=1 MakeprgGlobal let &g:makeprg="<args>" | echo "&g:makeprg = <args>"
+command! -nargs=1 MakeprgLocal  let &l:makeprg="<args>" | echo "&l:makeprg = <args>"
 
-    " <F5>: run make, asynchronously or split windows (dispatch)
-    map  <F5> <ESC>:w<CR>:RunMake<CR>
-    imap <F5> <ESC><F5>a
-
-    " <leader-F5>: run make with visible progress (split window in tmux)
-    map  <leader><F5> <ESC>:w<CR>:RunMake!<CR>
-
-else
-    " otherwise, fallback to default make
-    map <F5> <ESC>:w<CR>:make!<CR>
-    imap <F5> <ESC><F5>a
-endif
 
 " Make for vim script files is to reload itself.
 augroup VimscriptMakeprg
@@ -594,21 +615,35 @@ augroup VimscriptMakeprg
         \ <cmd>source %<CR><cmd>call VimNotify("Sourced " . bufname('%'))<CR>
 augroup END
 
-" Alternative to <F5>
-map <leader>m <F5>
-
 " }}}
 
-" <F6>: show/close quickfix window (scroll bottom)
-function! QuickfixToggle()
+
+" :OutputToggle or <F6> (Toggle mode)
+" -----------------------------
+
+" F6 :Output
+map  <silent> <F6>   <cmd>Output<CR>
+imap <silent> <F6>   <c-\><c-o><F6>
+":call QuickfixToggle()<CR>G:wincmd w<CR>a
+nmap <silent> <C-Q>  :call QuickfixToggle()<CR>
+
+" By default, :Output opens or closes the quickfix (copen) window
+" filetype plugin or individual buffers may override the command :Output (or :COpen)
+command! -nargs=0 -bar  Output          QuickfixToggle
+command! -nargs=0 -bar  QuickfixToggle  call QuickfixToggle()
+
+function! QuickfixToggle() abort
   let nr = winnr('$')
-  :TheCopen
+  :Copen
+  cbottom   " scroll the quickfix window to the last line
   let nr2 = winnr('$')
   if nr == nr2 | cclose | endif
 endfunction
-map  <silent> <F6> :call QuickfixToggle()<CR>
-imap <silent> <F6> <ESC>:call QuickfixToggle()<CR>G:wincmd w<CR>a
-nmap  <silent> <C-Q> :call QuickfixToggle()<CR>
+
+" Open the quickfix window scroll to the end (to see the status)
+" Note: asyncrun will override Copen later with asyncrun#quickfix_toggle
+command! -nargs=0 -bar       Copen   copen
+
 
 " <leader>L: show/close location list window
 function! LocListToggle()
@@ -624,6 +659,7 @@ map <F4> <ESC>:cn<CR>
 map [26~ <ESC>:cp<CR>
 map [1;2S <ESC>:cp<CR>
 map [29~ <ESC>:cp<CR>
+map <S-F4> <ESC>:cp<CR>
 
 " [F2] save
 imap <F2> <ESC>:w<CR>
@@ -652,12 +688,13 @@ if executable('rg')
 endif
 
 
-" CD: switch to the directory of the current buffer
+" CD: switch to the directory of the current buffer (or project root), per-tab
 function! CD_to(dir)
   if empty(a:dir) || a:dir == -1
     return
   endif
-  execute 'silent cd ' . a:dir
+  " Use per-tab CWD.see :help :tcd, :lcd, etc.
+  execute 'silent tcd ' . a:dir
   echohl Directory | echom getcwd() | echohl None
 
   " if NERDTree is open, chdir NERDTree as well
@@ -693,7 +730,7 @@ function! s:CDRoot() abort
   endif
 endfunction
 command! -nargs=0   CDRoot  :call s:CDRoot()
-nmap <silent> <leader>cd    :<C-U>CDRoot<CR>
+nmap <silent> <leader>cd    <cmd>CDRoot<CR>
 
 
 " <leader>R : screen sucks, redraw everything
@@ -708,9 +745,9 @@ nnoremap <leader>src   <cmd>call _source_rc()<CR>
 if v:vim_did_enter == 0   " Do not redefine the function
   function! _source_rc() abort
     if has('nvim')
-      source ~/.config/nvim/init.vim
+      source ~/.config/nvim/init.lua
       doautocmd VimEnter
-      echo 'Sourced ~/.config/nvim/init.vim'
+      echo 'Sourced ~/.config/nvim/init.lua'
     else
       source ~/.vimrc
       doautocmd VimEnter
@@ -862,7 +899,7 @@ function! CommandAlias(aliasname, target, ...)
 
   " :aliasname => :target  (only applicable at the beginning of the command line)
   exec printf('cnoreabbrev <expr> %s ', a:aliasname)
-    \ .printf('((getcmdtype() ==# ":" && getcmdline() =~# "^%s") ? ', a:aliasname)
+    \ .printf('((getcmdtype() ==# ":" && getcmdline() =~# "^%s$") ? ', a:aliasname)
     \ .printf('("%s") : ("%s"))', escape(a:target, '"'), escape(a:aliasname, '"'))
 
   " optionally, make a dummy command to facilitate cmdline completion
@@ -874,6 +911,7 @@ endfunction
 " some basic command abbrs
 call CommandAlias('s%', 'source %')
 call CommandAlias('tnew', 'tabnew')
+call CommandAlias('E', 'e')
 
 " WinDo: Like :windo, but preserves the current window and view.
 function! WinDo(command) abort
@@ -899,16 +937,26 @@ endfunction
 command! -nargs=0 Q   call s:Q()
 
 " Lua utilities (helpful for debugging)
-if has('nvim-0.5.0')
-  function! LuaEcho(expr) abort
-    echo luaeval("vim.inspect(" . a:expr . ")")
-  endfunction
-  command! -complete=lua -nargs=* LuaEcho   call LuaEcho(<q-args>)
-  call CommandAlias('Luaecho', 'LuaEcho')
-  call CommandAlias('luaecho', 'LuaEcho')
-  call CommandAlias('luae', 'LuaEcho')
-  call CommandAlias('l', 'LuaEcho')
+if has('nvim')
+  " (nvim 0.7.0+) :lua= ... is equivalent as :lua print(vim.inspect(...))
+  call CommandAlias('LuaEcho', 'lua=')
+  call CommandAlias('luaecho', 'lua=')
+  call CommandAlias('luae', 'lua=')
+  call CommandAlias('le', 'lua=')
+  call CommandAlias('l', 'lua=')
+
+  call CommandAlias('L', 'lua')
+
+  " There is no ':require' command in vim; it is a common mistake with intending lua require...
+  call CommandAlias('require', 'lua require')
 endif
+
+" In the command mode, <CTRL-/> will toggle the command between `:lua` and `:lua=`
+cmap     <c-_> <c-/>
+cnoremap <expr> <c-/>
+      \ (getcmdtype() ==# ':' && getcmdline() =~# '^lua=') ? '<C-b><Del><Del><Del><Del>lua<C-e>' :
+      \ (getcmdtype() ==# ':' && getcmdline() =~# '^lua') ? '<C-b><Del><Del><Del>lua=<C-e>' :
+      \ ''
 
 " ----------------------------------------------------------------------------
 " <Leader>?/! : Google it / Feeling lucky
@@ -929,7 +977,7 @@ xnoremap <leader>! "gy:call <SID>goog(@g, 1)<cr>gv
 
 
 " command abbrevations
-" :eh, :vsh, :sph, :tabnewh => :{e, vs, sp, tabnew} %:h/
+" :eh, :vsh, :sph, :tabnewh (:th) => :{e, vs, sp, tabnew} %:h/
 "  (to open files in the same directory as the current buffer)
 function! EatWhitespace()
   let c = nr2char(getchar(0))
@@ -939,6 +987,7 @@ call CommandAlias('eh', "e %:h/<C-R>=EatWhitespace()<CR>")
 call CommandAlias('vsh', "vs %:h/<C-R>=EatWhitespace()<CR>")
 call CommandAlias('sph', "sp %:h/<C-R>=EatWhitespace()<CR>")
 call CommandAlias('tabnewh', "tabnew %:h/<C-R>=EatWhitespace()<CR>")
+call CommandAlias('th',      "tabnew %:h/<C-R>=EatWhitespace()<CR>")
 
 
 " :Toggle... command aliases
@@ -989,12 +1038,13 @@ endif
 " e.g., :Pyedit numpy.core will open $(site-packages)/numpy/core/__init__.py
 if has('nvim') && has('python3')
   " This feature requires jedi installed on the host python.
+  let g:python_jedi_available = 0
 python3 << EOF
 try:
   import jedi
   vim.command('let g:python_jedi_available = 1')
 except ImportError:
-  vim.command('let g:python_jedi_available = 0')
+  pass
 EOF
 
   " Get module path for the given module (e.g., numpy.core) *without* actually importing it.
@@ -1242,7 +1292,7 @@ let g:localvimrc_persistent = 2
 " vim-polyglot {{{
 
 " in favor of python-mode and vimtex ...
-let g:polyglot_disabled = ['python', 'python-indent', 'python-compiler', 'latex']
+let g:polyglot_disabled = ['python', 'python-indent', 'python-compiler', 'latex', 'rust']
 
 " polyglot syntax (coming from vim-lua) conflicts with
 " $VIMRUNTIME/syntax/lua.vim shipped with neovim 0.8.0+
@@ -1553,7 +1603,115 @@ let g:airline#extensions#tabline#show_buffers = 1
 let g:airline#extensions#whitespace#mixed_indent_algo = 1
 
 " ---------------------------------------------------------------- }}}
-" Neomake {{{
+" nvim-bqf (enhanced quickfix) {{{
+" See ~/.dotfiles/nvim/lua/config/quickfix.lua
+
+" ---------------------------------------------------------------- }}}
+" asyncrun.vim {{{
+" see ~/.vim/after/syntax/qf.vim for color + highlights
+
+" Note that asyncrun.vim allows only one job running at a time.
+" For multiple job dispatch, we may need more advanced plugins.
+
+" (Settings)
+" Do not open quickfix after job starts
+let g:asyncrun_open = 0
+" Trigger autocmd QuickFixCmdPost make after job finish (triggers errormarker)
+let g:asyncrun_auto = "make"
+
+
+command! -nargs=* -complete=customlist,MakeCommandCompletion AsyncMake
+      \ call AsyncMake(<q-args>)
+function! AsyncMake(qarg) abort
+  let l:qarg = (a:qarg)
+  if &makeprg == 'make'
+    exe 'AsyncRun make ' . l:qarg
+  else
+    if !empty(l:qarg)
+      echohl WarningMsg |
+      echo 'Error: Cannot have arguments with &makeprg = ' . &makeprg
+      echohl None
+      return
+    endif
+    exe 'AsyncRun ' . ExpandCmd(&makeprg)
+  endif
+endfunction
+call CommandAlias('R', 'AsyncRun')
+
+" Copen. Do not steal the cursor.
+command! -bar -count=9 Copen   call s:quickfix_toggle(<count>)
+function! s:quickfix_toggle(count) abort
+  if has('nvim') && get(nvim_win_get_config(0), 'relative', '') != ''
+    " floating window: run the built-in copen because asyncrun is buggy
+    call timer_start(0, { -> execute(printf('copen %d', a:count)) })
+  else
+    " normal window: use quickfix_toggle()
+    call asyncrun#quickfix_toggle(a:count, v:true)
+  endif
+endfunction
+
+" Alias :Run => :AsyncRun
+call CommandAlias('Run', 'AsyncRun', v:true)
+
+" asyncrun autocmd events: notification callback when job finishes
+augroup AsyncRunEvents
+  autocmd!
+  autocmd User AsyncRunStart  call OnAsyncRunJobStart()
+  autocmd User AsyncRunStop   call OnAsyncRunJobFinished()
+augroup END
+
+let g:asyncrun_job_status = {}
+function! OnAsyncRunJobStart() abort
+  let l:jobid = 3000   " asyncrun supports only ONE concurrent job
+  let g:asyncrun_job_status[l:jobid] = {
+        \ 'status': 'running',
+        \ 'cmdline': g:asyncrun_info,
+        \ }
+endfunction
+
+function! OnAsyncRunJobFinished() abort
+  let l:jobid = 3000   " asyncrun supports only ONE concurrent job
+  let l:job = get(g:asyncrun_job_status, l:jobid, {})
+  if l:job == {} | return | endif
+  let l:job['status'] = g:asyncrun_status
+
+  " Notifications.
+  if l:job['status'] != "success"
+    let l:failure_message = l:job['cmdline']
+    let l:job_title = printf("AsyncRun")   " TODO: How to get the cmd or job info?
+    call VimNotify('Job Failed: ' . l:failure_message, 'warn', {'title': l:job_title})
+
+    " Automatically show quickfix window if the job has failed.
+    " open the qf window at the bottom (regardless of overriden :Copen)
+    call asyncrun#quickfix_toggle(9, v:true) | cbottom
+  endif
+
+  " Statusline integration
+  " Remove the job from the statusline after 2 seconds
+  if !exists('*timer_start')
+    silent! unlet g:asyncrun_job_status[l:jobid]
+  else
+    call timer_start(2000, { -> execute(printf(
+          \"silent! unlet g:asyncrun_job_status[%d]", l:jobid)) })
+  endif
+endfunction
+
+" Actions in the asyncrun window
+augroup AsyncRunQuickfixWindow
+  autocmd!
+  " Ctrl-C twice: kill the asyncrun job
+  autocmd FileType qf    noremap <silent> <nowait> <buffer> <C-C>        <cmd>echo 'Press Ctrl-C twice to kill the job'<CR>
+  autocmd FileType qf    noremap <silent> <nowait> <buffer> <C-C><C-C>   <cmd>call AsyncrunQuickfixCtrlC()<CR>
+augroup END
+function! AsyncrunQuickfixCtrlC() abort
+  if g:asyncrun_status == "running"
+    AsyncStop
+  endif
+endfunction
+
+
+" ---------------------------------------------------------------- }}}
+" Neomake (deprecated) {{{
 
 " so that ':Neomake clean' invokes 'make clean'
 let g:neomake_clean_maker = { 'exe': 'make', 'args': ['clean'] }
@@ -1587,10 +1745,10 @@ function! s:OnNeomakeJobFinished()
 
   " Remove the job from the statusline after 2 seconds
   if !exists('*timer_start')
-    unlet g:neomake_job_status[l:context.jobinfo.make_id]
+    silent! unlet g:neomake_job_status[l:context.jobinfo.make_id]
   else
     call timer_start(2000, { -> execute(printf(
-          \"unlet g:neomake_job_status[%d]", l:context.jobinfo.make_id)) })
+          \"silent! unlet g:neomake_job_status[%d]", l:context.jobinfo.make_id)) })
   endif
 
   let l:bufnr = l:context.jobinfo.bufnr
@@ -1601,13 +1759,13 @@ function! s:OnNeomakeJobFinished()
   if l:exit_code != 0
     let l:failure_message = printf('%s%s ', l:failure_message, l:job['as_string']())
   endif
-  if !empty(l:failure_message)
+  if !empty(l:failure_message)  " fail
     call VimNotify('Job Failed: ' . l:failure_message, 'warn', {'title': l:job_title})
     copen | wincmd p   " copen, but not move to the quickfix window
     if !s:is_copen()
       let b:neomake_auto_copen = 1
     endif
-  else
+  else  " job success
     if g:neomake_job_notification > 0
       call VimNotify('Job Finished, Success.', 'info',
             \ {'title': l:job_title, 'timeout': 1000})
@@ -1638,6 +1796,22 @@ augroup END
 
 " }
 
+
+" ---------------------------------------------------------------- }}}
+" errormarker.vim (quickfix to signs) {{{
+
+" signs
+let g:errormarker_errortext = '✘'
+let g:errormarker_warningtext = ''
+let g:errormarker_errortextgroup = "DiagnosticSignError"
+let g:errormarker_warningtextgroup = "DiagnosticSignWarn"
+
+" text line
+let g:errormarker_errorgroup = 'ErrormarkerErrorText'
+let g:errormarker_warninggroup = 'ErrormarkerWarningText'
+
+hi ErrormarkerErrorText       guibg=#3d0f0f
+hi ErrormarkerWarningText     guibg=NONE
 
 " ---------------------------------------------------------------- }}}
 " FZF {{{
@@ -1781,10 +1955,10 @@ function! FzfSmart(path) abort
   let l:git_dir = s:get_git_dir(!empty(l:path) ? l:path : '%')
   if ! empty(l:git_dir)
     let l:old_cwd = getcwd()
-    execute ':cd ' . l:git_dir . '/..'
+    execute ':tcd ' . l:git_dir . '/..'
     echon ':GFiles (' | echohl Directory | echon getcwd() | echohl NONE | echon ')' | echon '    '
     GFiles -c -o --exclude-standard
-    execute ':cd ' . l:old_cwd
+    execute ':tcd ' . l:old_cwd
     return 2
 
   " (3) not in git repo, invoke :Files <args> by fallback
@@ -2135,8 +2309,8 @@ hi def link FloatermBorderNF  FloatermBorder
 command! -bang -nargs=? -complete=shellcmd  T                    :FloatermToggleOrNew<bang> <args>
 command! -bang -nargs=? -complete=shellcmd  FT                   :FloatermToggleOrNew<bang> <args>
 command! -bang -nargs=? -complete=shellcmd  FloatermToggleOrNew  call FloatermToggleOrNew(<q-args>, <bang>0)
-nnoremap <leader>tt  :FloatermToggle<CR>
-"
+nnoremap <leader>tt  :FloatermToggleOrNew<CR>
+
 function! FloatermToggleOrNew(...) abort
   " FloatermToggleOrNew(cmdline: str, bang: int = 0)
   "  - if bang=1, run the command in a shell use sendkeys.
@@ -2153,7 +2327,7 @@ function! FloatermToggleOrNew(...) abort
     elseif !bang
       " if argument given but without bang,
       " use it as the command line to execute (e.g. :FT git status)
-      execute ':FloatermNew --name=FT ' . cmd
+      execute ':FloatermNew --name=FT --autoclose=0 ' . cmd
     elseif bang
       " Given bang, (e.g. :FT! git status) run cmd in a (interactive) shell.
       execute ':FloatermNew --name=FT --autoclose=1'
@@ -2172,6 +2346,9 @@ let g:floaterm_height = 0.7
 " Turn off auto-hiding of previous floaterm windows,
 " in favor of the autohide autocmd below (only works for 'floating' windows)
 let g:floaterm_autohide = 0
+
+" Turn off GIT_EDITOR integration.
+let g:floaterm_giteditor = 0
 
 augroup FloatermCustom
   autocmd!
@@ -2916,6 +3093,7 @@ augroup END
 
 " ---------------------------------------------------------------- }}}
 " fugitive {{{
+" See also: config/git.lua
 
 let g:fugitive_legacy_commands = 0
 
@@ -2938,11 +3116,19 @@ command! -nargs=* GCommit :Git commit -v<args>
 augroup FugitiveCustomizeCommands
   autocmd CmdlineEnter * ++once silent! delcommand GDelete
 
- " :G -> :GDiff + :Git
-  autocmd CmdlineEnter * ++once command! -nargs=0 G
-        \ execute 'GDiff' | execute 'Git'
-
+ " :G -> :GDiff + :Git,  or :Git <args>
+  autocmd CmdlineEnter * ++once command! -nargs=?  G    call s:G(<q-args>)
 augroup END
+
+function! s:G(arg) abort
+  if empty(Trim(a:arg))
+    GDiff
+    Git | resize 5 | set winfixheight
+  else
+    exec 'Git ' . a:arg
+  endif
+endfunction
+
 
 " fugitive key mappings
 nnoremap <leader>gd :Gvdiff<CR>
@@ -3018,62 +3204,13 @@ endif
 " gitsigns.nvim {{{
 " :Gitsigns
 
-function! s:setup_gitsigns() abort
-lua << EOF
-require('gitsigns').setup {
-  signs = {
-    -- For highlights, see ~/.vim/colors/xoria256-wook.vim
-    add          = {hl = 'GitSignsAdd'   , text = '┃', numhl='GitSignsAddNr'   , linehl='GitSignsAddLn'},
-    change       = {hl = 'GitSignsChange', text = '┃', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
-    delete       = {hl = 'GitSignsDelete', text = '_', numhl='GitSignsDeleteNr', linehl='GitSignsDeleteLn'},
-    topdelete    = {hl = 'GitSignsDelete', text = '‾', numhl='GitSignsDeleteNr', linehl='GitSignsDeleteLn'},
-    changedelete = {hl = 'GitSignsChange', text = '┃', numhl='GitSignsChangeNr', linehl='GitSignsChangeLn'},
-  },
-  signcolumn = true,
-  current_line_blame_opts = {
-    delay = 150,
-    virt_text_pos = 'right_align',
-    ignore_whitespace = true,
-  },
-  on_attach = function(bufnr)
-    local function map(mode, lhs, rhs, opts)
-      opts = vim.tbl_extend('force', {noremap = true, silent = true}, opts or {})
-      vim.api.nvim_buf_set_keymap(bufnr, mode, lhs, rhs, opts)
-    end
-    -- Navigation
-    map('n', ']c', "&diff ? ']c' : '<cmd>Gitsigns next_hunk<CR>'", {expr=true})
-    map('n', '[c', "&diff ? '[c' : '<cmd>Gitsigns prev_hunk<CR>'", {expr=true})
-    -- Actions
-    map('n', '<leader>hs', '<cmd>Gitsigns stage_hunk<CR>')
-    map('n', '<leader>hr', '<cmd>Gitsigns reset_hunk<CR>')
-    map('v', '<leader>hs', '<cmd>Gitsigns stage_hunk<CR>')
-    map('v', '<leader>hr', '<cmd>Gitsigns reset_hunk<CR>')
-    map('n', '<leader>hS', '<cmd>Gitsigns stage_buffer<CR>')
-    map('n', '<leader>hu', '<cmd>Gitsigns undo_stage_hunk<CR>')
-    map('n', '<leader>hR', '<cmd>Gitsigns reset_buffer<CR>')
-    map('n', '<leader>hp', '<cmd>Gitsigns preview_hunk<CR>')
-    map('n', '<leader>hb', '<cmd>lua require"gitsigns".blame_line {full=true, ignore_whitespace=true}<CR>')
-    map('n', '<leader>tb', '<cmd>Gitsigns toggle_current_line_blame<CR>')
-    map('n', '<leader>hd', '<cmd>Gitsigns diffthis<CR>')                    -- Diff against stage
-    map('n', '<leader>hD', '<cmd>lua require"gitsigns".diffthis("~")<CR>')  -- Diff against HEAD
-    map('n', '<leader>td', '<cmd>Gitsigns toggle_deleted<CR>')
-    -- Text object
-    map('o', 'ih', ':<C-U>Gitsigns select_hunk<CR>')
-    map('x', 'ih', ':<C-U>Gitsigns select_hunk<CR>')
+" see ~/.config/nvim/lua/config/git.lua
 
-    -- Additional keymappings (actions) other than the suggested defaults
-    map('n', '<leader>ha', '<cmd>Gitsigns stage_hunk<CR>')
-    map('v', '<leader>ha', '<cmd>Gitsigns stage_hunk<CR>')
-    map('n', '<leader>hh', '<cmd>Gitsigns toggle_linehl<CR>')
-    map('n', '<leader>hw', '<cmd>Gitsigns toggle_word_diff<CR>')
-  end
-}
-EOF
-endfunction
+" ---------------------------------------------------------------- }}}
+" diffview.nvim {{{
+" Assumed fugitive is always available.
 
-if HasPlug('gitsigns.nvim')
-  autocmd User LazyInit  call s:setup_gitsigns()
-endif
+" see ~/.config/nvim/lua/config/git.lua
 
 " ---------------------------------------------------------------- }}}
 " vim-gitgutter (legacy) {{{
@@ -3127,39 +3264,6 @@ let g:flog_permanent_default_arguments = {
       \ }
 
 hi flogHash  guifg=#ffd43b
-
-" ---------------------------------------------------------------- }}}
-" diffview.nvim {{{
-" Assumed fugitive is always available.
-
-if IsPlugInstalled('diffview.nvim')
-lua << EOF
-  require('diffview').setup {
-    default_args = {
-      DiffviewOpen = { '--untracked-files=no' },
-    }
-  }
-EOF
-  " :GHistory <files>
-  command! -nargs=* -complete=file GHistory   DiffviewFileHistory <args>
-  " :GDiff <revision>     to HEAD
-  command! -nargs=* -complete=customlist,DiffviewCmdCompletion  GDiff  DiffviewOpen <args>
-  " :GShow <revision>
-  command! -nargs=+ -complete=customlist,DiffviewCmdCompletion  GShow  DiffviewOpen <args>^1..<args>
-
-  " cmd completion functions for aliased commands.
-  function! DiffviewCmdCompletion(argLead, cmdLine, curPos)
-    return luaeval("require'diffview'.completion("
-          \ . "vim.fn.eval('a:argLead'),"
-          \ . "vim.fn.eval('a:cmdLine'),"
-          \ . "vim.fn.eval('a:curPos'))")
-  endfunction
-lua << EOF
-  local completers = require('diffview').completers
-  completers.GDiff = completers.DiffviewOpen
-  completers.GShow = completers.DiffviewOpen
-EOF
-endif
 
 " ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{
