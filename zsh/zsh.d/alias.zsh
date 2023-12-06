@@ -9,18 +9,26 @@ _version_check() {
 # -----------------------------
 
 # Basic
-alias reload!="command -v antidote 2>&1 > /dev/null && antidote reset; \
-    source ~/.zshrc && echo 'sourced ~/.zshrc' again"
+alias reload!="command -v antidote 2>&1 > /dev/null && antidote reset; exec zsh --login"
 alias c='command'
 alias ZQ='exit'
 alias QQ='exit'
 
-alias cp='nocorrect cp -iv'
+alias cp='nocorrect cp -ivp'
 alias mv='nocorrect mv -iv'
 alias rm='nocorrect rm -iv'
 
 # sudo, but inherits $PATH from the current shell
 alias sudoenv='sudo env PATH=$PATH'
+
+alias path='print -l $path'
+function fpath() {
+  if [ $# == 0 ]; then
+    print -l $fpath
+  else  # fpath _something: find _something within all $fpath's
+    local f; for f in `fpath`; do find -L $f -maxdepth 1 -type f -name "$@" | xargs exa; done
+  fi
+}
 
 if (( $+commands[htop] )); then
     alias top='htop'
@@ -29,8 +37,11 @@ if (( $+commands[htop] )); then
 fi
 
 # list
-if command -v exa 2>&1 >/dev/null; then
-    # exa is our friend :)
+if command -v eza 2>&1 >/dev/null; then
+    # eza is our friend :)
+    alias ls='eza'
+    alias l='eza --long --group --git'
+elif command -v exa 2>&1 >/dev/null; then
     alias ls='exa'
     alias l='exa --long --group --git'
 else
@@ -57,6 +68,17 @@ alias zshrc='vim +cd\ ~/.zsh -O ~/.zsh/zshrc ~/.zsh/zsh.d/alias.zsh'
 function plugged() {
     [ -z "$1" ] && { echo "plugged: args required"; return 1; }
     cd "$HOME/.vim/plugged/$1"
+}
+
+# Running lua tests for neovim in the command line
+function plenary-busted() {
+    if [ $# == 0 ]; then
+        plenary-busted . || return 1;
+    else
+        for f in "$@"; do
+            nvim --headless --clean -u ~/.dotfiles/nvim/init.testing.lua -c "PlenaryBustedDirectory $f" || return 1;
+        done
+    fi
 }
 
 # Tmux ========================================= {{{
@@ -88,8 +110,8 @@ alias tmuxa='tmux -2 attach-session -d -t'
 # tmux kill-session -t
 alias tmuxkill='tmux kill-session -t'
 
-# I am lazy, yeah
-alias t='tmuxa'
+# t <session>: attach to <session> (if exists) or create a new session with the name
+alias t='tmux new-session -AD -s'
 alias T='TMUX= tmuxa'
 
 # tmuxp
@@ -110,6 +132,7 @@ function tmuxp {
 
 alias set-pane-title='set-window-title'
 alias tmux-pane-title='set-window-title'
+alias tmux-window-title='tmux rename-window'
 
 # }}}
 # SSH ========================================= {{{
@@ -141,7 +164,14 @@ GIT_VERSION=$(git --version | awk '{print $3}')
 
 alias github='\gh'
 
-alias gh='git history'
+function ghn() {
+    # git history, but truncate w.r.t the terminal size. Assumes not headless.
+    # A few lines to subtract from the height: previous prompt (2) + blank (1) + current prompt (2)
+    local num_lines=$(($(stty size | cut -d" " -f1) - 5))
+    if [[ $num_lines -gt 25 ]]; then num_lines=$((num_lines - 5)); fi  # more margin
+    git history --color=always -n$num_lines "$@" | head -n$num_lines | less --QUIT-AT-EOF -F
+}
+alias gh='ghn'
 alias ghA='gh --all'
 if _version_check $GIT_VERSION "2.0"; then
   alias gha='gh --exclude=refs/stash --all'
@@ -149,7 +179,11 @@ else
   alias gha='gh --all'   # git < 1.9 has no --exclude option
 fi
 
-alias gd='git diff --no-prefix'
+if (( $+commands[delta] )); then
+    alias gd='git -c core.pager="delta" diff --no-prefix'
+else
+    alias gd='git diff --no-prefix'
+fi
 alias gdc='gd --cached --no-prefix'
 alias gds='gd --staged --no-prefix'
 alias gs='git status'
@@ -212,9 +246,11 @@ function gsd() {
   return 0
 }
 
+alias gfx='git fixup'
+
 # using the vim plugin GV/Flog
 function _vim_gv {
-    vim -c ":GV $1"
+    vim -c ":GV $1" -c "tabclose $"
 }
 alias gv='_vim_gv'
 alias gva='gv --all'
@@ -224,6 +260,9 @@ function cd-git-root() {
   local _root; _root=$(git-root)
   [ $? -eq 0 ] && cd "$_root" || return 1;
 }
+
+# Unalias some prezto aliases due to conflict
+if alias gpt > /dev/null; then unalias gpt; fi
 
 # }}}
 
@@ -276,9 +315,9 @@ alias python-config='${$(which python)%/*}/python3-config'
 alias python3-config='${$(which python)%/*}/python3-config'
 
 # ipython
-alias ipython='python -m IPython'
-alias ipy='ipython'
-alias ipypdb='ipy -c "%pdb" -i'   # with auto pdb calling turned ON
+alias ipython='python -m IPython --no-confirm-exit'
+alias ipy='ipython --InteractiveShellApp.exec_lines "%i"'  # see ~/.pythonrc.py
+alias ipypdb='ipy --InteractiveShellApp.exec_lines "%pdb"'   # with auto pdb calling turned ON
 
 alias ipynb='jupyter notebook'
 alias ipynb0='ipynb --ip=0.0.0.0'
@@ -385,7 +424,20 @@ if (( $+commands[http-server] )); then
     alias http-server="http-server -c-1"
 fi
 
-if (( $+commands[pydf] )); then
+# ffmpeg/ffprobe
+# Use -hide_banner, only if args are provided (if no args, show banner)
+if (( $+commands[ffmpeg] )); then
+  alias ffmpeg='(){ ffmpeg ${@:+-hide_banner} $@ ;}'
+fi
+if (( $+commands[ffprobe] )); then
+  alias ffprobe='(){ ffprobe ${@:+-hide_banner} $@ ;}'
+fi
+
+# df (duf, pydf)
+if (( $+commands[duf] )); then
+    # dotfiles install duf
+    alias df="duf"
+elif (( $+commands[pydf] )); then
     # pip install --user pydf
     # pydf: a colorized df
     alias df="pydf"
@@ -432,6 +484,10 @@ if [[ "$(uname)" == "Darwin" ]]; then
         alias pbcopy='reattach-to-user-namespace pbcopy'
         alias pbpaste='reattach-to-user-namespace pbpaste'
     fi
+
+    # Misc.
+    alias texshop-preview="texshop"
+
 fi
 
 

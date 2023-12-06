@@ -1,18 +1,13 @@
 -- config/quickfix.lua
 
--- [[ nvim-bqf ]]
-if not pcall(require, 'bqf') then
-  print("Warning: telescope not available, skipping configuration.")
-  return
-end
-
 local M = {}
 
 -- [[ Useful commands and keys (https://github.com/kevinhwang91/nvim-bqf#function-table)
 --     zf: Enter the fzf search mode
 -- ]]
 
-M.setup_bqf = function()
+
+function M.setup_bqf()
   -- https://github.com/kevinhwang91/nvim-bqf#setup-and-description
   -- https://github.com/kevinhwang91/nvim-bqf#advanced-configuration
   require "bqf".setup {
@@ -33,7 +28,7 @@ M.setup_bqf = function()
     },
   }
 
-  do  -- Highlights for the preview window
+  require "utils.rc_utils".RegisterHighlights(function()
     vim.cmd [[
 
       " use more discernable colors
@@ -43,12 +38,9 @@ M.setup_bqf = function()
       highlight! link BqfPreviewCursor      BqfPreviewFloat
 
     ]]
-  end
-end
+  end)
 
-
--- Custom commands (local) on the quickfix windowfix window
-M.setup_qf_commands = function()
+  -- Custom commands (local) on the quickfix windowfix window
   vim.cmd [[
     augroup bqfQuickfixWindow
       autocmd!
@@ -63,5 +55,50 @@ M.setup_qf_commands = function()
   ]]
 end
 
-M.setup_bqf()
-M.setup_qf_commands()
+
+--- Toggle quickfix window (either :copen or :cclose),
+--- but do not steal the cursor (preserve the current window)!
+--- Should work also well even when the current window is floating, etc.
+function M.toggle_quickfix()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.api.nvim_get_option_value("buftype", { buf = buf }) == "quickfix" then
+      vim.cmd.cclose()
+      return
+    end
+  end
+  vim.cmd.Copen()  -- :Copen might be overridden by ftplugin
+end
+-- :QuickfixToggle, :CToggle
+vim.api.nvim_create_user_command('QuickfixToggle', function(e) M.toggle_quickfix() end, { bar = true })
+vim.api.nvim_create_user_command('CToggle', function(e) M.toggle_quickfix() end, { bar = true })
+
+
+--- Like :copen, but do not steal the cursor.
+--- @param opts? table  mods: string?, count: integer?, height: integer?
+function M.open_quickfix(opts)
+  opts = vim.tbl_extend("force", {}, opts or {})
+  opts.mods = (opts.mods and opts.mods ~= "") and opts.mods or 'botright'
+  opts.count = (opts.count and opts.count ~= 0) and opts.count or ''
+
+  local current_win = vim.api.nvim_get_current_win()
+  vim.cmd(([[ %s %scopen %s ]]):format(opts.mods, opts.count, opts.height or ''))
+
+  -- Move back to the previous window, so that the cursor is not stolen by quickfix
+  if vim.api.nvim_win_is_valid(current_win) then
+    vim.api.nvim_set_current_win(current_win)
+  end
+end
+-- :Copen, :[modifier] [count]Copen [height]
+vim.api.nvim_create_user_command('Copen', function(e)
+  M.open_quickfix({ height = e.args, mods = e.mods, count = e.count })
+end, { bar = true, count = true, nargs = '?' })
+
+
+-- Resourcing support
+if RC and RC.should_resource() then
+  M.setup_bqf()
+end
+
+(RC or {}).quickfix = M
+return M
