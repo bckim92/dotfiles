@@ -76,11 +76,11 @@ $ dotfiles install ripgrep        # -> ~/.local/bin/rg
       In such cases you should delete these files *manually*.
 
 * Q: I see some weird icons like `⍰` in (neo)vim or in the [statusline](https://github.com/powerline/powerline#vim-statusline).
-  * A: Use [Nerd fonts](https://github.com/ryanoasis/nerd-fonts) v3.1. If you haven't upgrade to Nerd fonts [**v3** or higher](https://github.com/ryanoasis/nerd-fonts/releases/tag/v3.1.0), upgrade to v3 due to the new (breaking) Material Design Icons codepoints.
-  * Mac users can install via: `brew install --cask font-*-nerd-font`.
-    (Minimal fonts: `brew install --cask font-jetbrains-mono-nerd-font`)
-  * If you want to upgrade from v2, try `brew reinstall --cask $(brew list | grep nerd-font)`.
-  * Note: `JetBrainsMono Nerd Font Mono` -> `JetBrainsMono NFM` (v3.1)
+  - A: Use [Nerd fonts](https://github.com/ryanoasis/nerd-fonts) v3. If you haven't upgrade to Nerd fonts [**v3.1.1** or higher](https://github.com/ryanoasis/nerd-fonts/releases/tag/v3.1.1), upgrade to v3 due to the new (breaking) Material Design Icons codepoints.
+    - Note: `JetBrainsMono Nerd Font Mono` ~~`JetBrainsMono NFM`~~ (nerd-fonts [v3.1.0 is buggy](https://github.com/ryanoasis/nerd-fonts/issues/1434))
+  - Mac users can install via: `brew install --cask font-*-nerd-font`.
+    - (Minimal fonts only `brew install --cask font-jetbrains-mono-nerd-font`)
+  - To upgrade existing installations, try `brew reinstall --cask $(brew list | grep nerd-font)`.
 
 * If neovim + treesitter emits an error like `query: invalid node type`, run `:TSUpdate` (and wait for installation is done).
   * See [nvim-treesitter#3092](https://github.com/nvim-treesitter/nvim-treesitter/issues/3092) for more details.
@@ -88,10 +88,10 @@ $ dotfiles install ripgrep        # -> ~/.local/bin/rg
 * If neovim cannot run due to `version 'GLIBC_2.29' not found` errors (on Ubuntu 18.04 or earlier),
   you should upgrade your Ubuntu distribution to 20.04+ in order to run nvim 0.8.x or higher.
   If you use [appimage](https://github.com/neovim/neovim/releases/tag/stable) binary of neovim,
-  this will work in Ubuntu 18.04; install neovim through `dotfiles install neovim` or `NEOVIM_VERSION=0.9.2 dotfiles install neovim`.
+  this will work in Ubuntu 18.04; install neovim through `dotfiles install neovim` or `NEOVIM_VERSION=0.9.4 dotfiles install neovim`.
 
 * If [**neovim**][neovim] emits any startup errors (e.g. `no module named neovim`):
-    * Use **latest neovim** (e.g., neovim 0.9.2).
+    * Use **latest neovim** (e.g., neovim 0.9.5).
       To install/upgrade neovim on your system, you can run `dotfiles install neovim` (linux) or `brew install neovim` (mac).
     * Try `:checkhealth`.
     * Try `:Lazy update`: some errors from vim plugin could be easily solved by updating plugins to date.
@@ -125,4 +125,4 @@ License
 
 [The MIT License (MIT)](LICENSE)
 
-Copyright (c) 2012-2023 Jongwook Choi (@wookayin)
+Copyright (c) 2012-2024 Jongwook Choi (@wookayin)

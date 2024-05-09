@@ -7,9 +7,11 @@ local PlugConfig = require('utils.plug_utils').PlugConfig
 return {
   -- Folding
   Plug 'kevinhwang91/nvim-ufo' {
+    enabled = vim.fn.has('nvim-0.9') > 0,
     dependencies = {'kevinhwang91/promise-async'},
     event = 'VeryLazy',
-    config = require('config.folding').setup,
+    init = require('config.folding').before_ufo,
+    config = require('config.folding').setup_ufo,
   };
 
   -- Better Undo
@@ -33,6 +35,12 @@ return {
     enabled = #(os.getenv('SSH_TTY') or "") > 0,  -- if inside SSH
   };
 
+  -- Colors
+  Plug 'NvChad/nvim-colorizer.lua' {
+    event = { 'BufReadPost' },
+    config = require("config.utilities").setup_colorizer,
+  };
+
   -- Misc
   Plug 'lewis6991/hover.nvim' {
     config = require("config.utilities").setup_hover,
@@ -40,9 +48,7 @@ return {
   };
   Plug 'tpope/vim-commentary' { init = PlugConfig, event = 'VeryLazy' };
   Plug 'szw/vim-maximizer' { cmd = 'MaximizerToggle' };
-  Plug 'tpope/vim-eunuch' { event = 'CmdlineEnter', init = function() vim.g.eunuch_no_maps = true; end };
   Plug 'junegunn/goyo.vim' { cmd = 'Goyo' };
-  Plug 'junegunn/vader.vim' { cmd = 'Vader', ft = 'vader' };
   Plug 'cocopon/colorswatch.vim' { cmd = 'ColorSwatchGenerate' };
   Plug 'wookayin/vim-typora' { cmd = 'Typora' };
   Plug 'mrjones2014/dash.nvim' {

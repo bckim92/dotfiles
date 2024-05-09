@@ -19,28 +19,14 @@ endif
 " 0. Load Plugin {{{
 """""""""""""""""""""""""""""""""""""""""
 
-" All the vim plugins are managed by 'vim-plug'
-" and listed up in the separate file 'plugins.vim',
-" so that this vimrc would still work standalone without plugins.
 let g:plugs = {}
-if filereadable(expand('$HOME/.vim/plugins.vim')) && !has('nvim')
-  " Note: on neovim, we will switch to lazy.vim (see init.lua).
-  " For the time being neovim <= 0.7.x will have limited support with vim-plug
-  " during the gradual transition period.
+if !has('nvim') && filereadable(expand('$HOME/.vim/plugins.vim'))
+  " Note: for neovim, we use lazy.vim in place of vim-plug.
   source $HOME/.vim/plugins.vim
 endif
 
 " Functions to be executed for each plugin BEFORE the plugin loads.
 let g:PlugConfig = {}
-
-" private helper functions
-function! s:list_plugs() abort
-  if has('nvim-0.8')   " lazy.nvim
-    return luaeval('require "config/plugins".list_plugs()')
-  else
-    return keys(g:plugs)
-  end
-endfunction
 
 " }}}
 """""""""""""""""""""""""""""""""""""""""
@@ -125,10 +111,6 @@ if has('nvim')
     autocmd TermOpen,TermEnter * setlocal scrolloff=0 sidescrolloff=0
     autocmd TermOpen           * setlocal signcolumn=no
   augroup end
-endif
-
-if has('nvim')
-  set signcolumn=yes:1
 endif
 
 " search
@@ -266,8 +248,9 @@ if has('nvim')
   set shada=!,'10000,<100,s10,h
 endif
 
-" miscellanious
-set visualbell
+" shut up, vim
+set novisualbell
+set belloff=all
 
 " lazyredraw: no redrawing during macro execution
 " This should NOT be set during startup if < 0.9.1, see neovim/neovim#23534
@@ -395,7 +378,7 @@ nnoremap <leader>:  :
 
 nnoremap <Space> :
 
-inoremap <silent> <C-k>       <Cmd>stopinsert<CR><Cmd>update<CR>
+inoremap <silent> <C-k>       <Cmd>stopinsert<CR><Cmd>if &buftype == '' <bar> update <bar> endif<CR>
 nnoremap          <leader>e   <Cmd>e<CR>zR
 
 nnoremap Q <Nop>
@@ -440,15 +423,15 @@ EOF
 endif
 
 " window navigation
-noremap <C-h> <C-w>h
-noremap <C-j> <C-w>j
-noremap <C-k> <C-w>k
-noremap <C-l> <C-w>l
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
 
-noremap <M-h> <C-w>h
-noremap <M-j> <C-w>j
-noremap <M-k> <C-w>k
-noremap <M-l> <C-w>l
+nnoremap <M-h> <C-w>h
+nnoremap <M-j> <C-w>j
+nnoremap <M-k> <C-w>k
+nnoremap <M-l> <C-w>l
 
 " window navigation: aware of tmux
 let g:tmux_navigator_no_mappings = 1
@@ -482,21 +465,12 @@ endif
 nnoremap <C-w>z  <Cmd>MaximizerToggle<CR>
 let g:maximizer_set_default_mapping = 0         " do not map <F3>
 
+" Alt-R: toggle relative line number
+nnoremap <M-r> <Cmd>setlocal relativenumber!<CR>
+
 " well...?
 inoremap <C-C> <ESC>
 
-
-" Folding and unfolding
-" see ~/.config/nvim/lua/config/folding.lua
-let g:PlugConfig['nvim-ufo'] = 's:init_nvim_ufo'
-function! s:init_nvim_ufo() abort
-  " Need to disable zM, zR because it will change foldlevel
-  " if executed before the keymap settings of nvim-ufo has been effective.
-  nnoremap <plug>(nvim-ufo-not-ready)  <cmd>lua vim.schedule_wrap(vim.notify)(
-        \ "nvim-ufo is yet to be initialized, please try again later...", "warn", { timeout = 500, title = "nvim-ufo" })<CR>
-  nmap <silent> zM  <plug>(nvim-ufo-not-ready)
-  nmap <silent> zR  <plug>(nvim-ufo-not-ready)
-endfunction
 
 " z<space> toggles folding.
 " It will open the current fold recursively when fold is closed,
@@ -586,6 +560,15 @@ if has('nvim')
   tnoremap <silent> ]b <Cmd>bnext<CR>
 endif
 
+" Managing buffers
+nnoremap <leader>b0   <Cmd>bfirst<CR>
+nnoremap <leader>b$   <Cmd>blast<CR>
+nnoremap <leader>bd   <Cmd>bdelete<CR>
+nnoremap <leader>Q    <Cmd>bdelete<CR>
+nnoremap <leader>bq   <Cmd>bdelete<CR>
+nnoremap <leader>bn   <Cmd>bnext<CR>
+nnoremap <leader>bp   <Cmd>bprev<CR>
+
 " Tab navigations
 nnoremap <silent> [t  <Cmd>tabprevious<CR>
 nnoremap <silent> ]t  <Cmd>tabnext<CR>
@@ -637,6 +620,7 @@ nnoremap ]l  <Cmd>lnext<CR>
 " However, we should NOT directly remap <F5> and <Ctrl-F5>.
 
 " By default, <F5> runs :Build -> :Make. Ftplugins may define :Build and :Debug.
+" see config/dap.lua to how :Debug will be overriden when DAP exists
 nmap <F5>    <cmd>silent w<CR><cmd>Build<CR>
 nmap <C-F5>  <F5>
 nmap <M-F5>  <cmd>silent w<CR><cmd>Debug<CR>
@@ -649,7 +633,6 @@ nmap <leader>m <F5>
 
 " Build commands default to Make
 command! -nargs=* -bar Build    Make
-command! -nargs=* -bar Debug    echohl WarningMsg | echon ":Debug not defined for this filetype. Try :Build instead." | echohl NONE
 
 " :Make
 " runs a &makeprg job asynchronously in the background.
@@ -684,14 +667,9 @@ command! -nargs=1 Makeprg       let &makeprg="<args>" | echo "&makeprg = <args>"
 command! -nargs=1 MakeprgGlobal let &g:makeprg="<args>" | echo "&g:makeprg = <args>"
 command! -nargs=1 MakeprgLocal  let &l:makeprg="<args>" | echo "&l:makeprg = <args>"
 
-
-" Make for vim script files is to reload itself.
-" See <leader>so keymappings as well
-augroup VimscriptMakeprg
-  autocmd!
-  autocmd FileType vim   nmap <buffer> <F5>   <cmd>SourceThis<CR>
-augroup END
-command! -nargs=0 SourceThis   source % | call VimNotify("Sourced " . bufname('%'), 'info', {'title': 'SourceThis'})
+" :Just, :just
+command! -nargs=* -bar Just   AsyncRun just <q-args>
+autocmd CmdlineEnter * ++once call CommandAlias('just', 'Just')
 
 " }}}
 
@@ -828,25 +806,6 @@ if v:vim_did_enter == 0   " Do not redefine the function
     endif
   endfunction
 endif
-
-" <leader>so: source or execute the selection as vimscript or lua
-nnoremap <leader>so   <cmd>SourceThis<CR>
-xnoremap <leader>so   <cmd>call _source_visual_notify()<CR>:so<CR>
-function! _source_visual_notify() abort
-  if !has('nvim') | return | endif
-lua << EOF
-  -- Note: do not use '< and '> markers which get updated after leaving the visual mode
-  local vstart = vim.fn.getpos("v")
-  local vend = vim.fn.getpos(".")
-  local line_start = vstart[2]
-  local line_end = vend[2]
-  if line_start > line_end then
-    line_start, line_end = line_end, line_start
-  end
-  local lines = vim.api.nvim_buf_get_lines(0, line_start - 1, line_end, true)
-  vim.notify(table.concat(lines, '\n'), 'info', {title = 'Sourced visual selection'})
-EOF
-endfunction
 
 " :Vimrc opens vim config files in a new tab
 command! -nargs=0 Vimrc   call s:open_vimrc_tab()
@@ -1022,6 +981,7 @@ call CommandAlias('t', 'tab')  " we don't use :copy
 call CommandAlias('v', 'vertical')  " we don't use :vglobal
 
 call CommandAlias('vsb', 'vertical sb')
+call CommandAlias('vb', 'vertical sb')
 
 " WinDo: Like :windo, but preserves the current window and view.
 function! WinDo(command) abort
@@ -1314,9 +1274,11 @@ augroup NrHighlight
         \ | endif
 augroup END
 
-" vim syntax: embedded python (P) and lua (l) scripts
-" see $VIMRUNTIME/syntax/vim.vim
-let g:vimsyn_embed = 'lP'
+" vim syntax: embedded python (P) and lua (l) scripts; see $VIMRUNTIME/syntax/vim.vim
+" DO NOT EMBED LUA SYNTAX, ALWAYS BROKEN (neovim/neovim#20456) both in VIM and NVIM 0.8+
+" Note that we have completely moved to treesitter highlighting
+let g:vimsyn_embed = 'P'
+autocmd FileType vim hi! vimEmbedError   guifg=NONE guibg=NONE
 
 " filetype detections
 au BufRead,BufNewFile /etc/nginx/* if &ft == '' | setfiletype nginx | endif
@@ -1340,7 +1302,7 @@ command! StripTrailingWhitespacesToggle  let g:enable_strip_trailing_whitespaces
 
 augroup AutoStripTrailingWhitespaces
   autocmd!
-  autocmd FileType c,cpp,java,javascript,html,ruby,python,pandoc
+  autocmd FileType c,cpp,java,javascript,html,ruby,python,markdown
         \ autocmd BufWritePre <buffer> :call StripTrailingWhitespaces()
 augroup END
 
@@ -1372,12 +1334,6 @@ endif
 " neovim 0.4.0+ : semi-transparent popup menu
 if has('nvim') && has('termguicolors') && (&termguicolors)
   silent! set pumblend=10
-endif
-
-" Use different popupmenu highlight color for nvim-lsp
-if get(g:, 'dotfiles_completion_backend') == '@lsp'
-  " oc-yellow-1
-  hi Pmenu guibg=#fff3bf
 endif
 
 " http://vim.wikia.com/wiki/Identify_the_syntax_highlighting_group_used_at_the_cursor
@@ -1474,36 +1430,6 @@ let g:polyglot_disabled += ['lua']
 let g:polyglot_disabled += ['markdown']
 
 " ---------------------------------------------------------------- }}}
-" vim-startify {{{
-
-let g:startify_bookmarks = [
-    \ '~/.vim/vimrc',
-    \ '~/.vim/plugins.vim',
-    \ ]
-
-let g:startify_skiplist = [
-    \ 'COMMIT_EDITMSG',
-    \ $VIMRUNTIME .'/doc',
-    \ 'plugged/.*/doc',
-    \ 'bundle/.*/doc',
-    \ ]
-
-" ---------------------------------------------------------------- }}}
-" vim-eunuch {{{
-
-" remove all rm-like commands, which are too dangerous (even no confirm...)
-let g:PlugConfig['vim-eunuch'] = 's:init_eunuch'
-function! s:init_eunuch() abort
-  autocmd User LazyInit call s:remove_eunuch_commands()
-  function! s:remove_eunuch_commands()
-    if !exists('g:loaded_eunuch') | return | endif
-    if exists(':Remove') | delcommand Remove | endif
-    if exists(':Delete') | delcommand Delete | endif
-    if exists(':Unlink') | delcommand Unlink | endif
-  endfunction
-endfunction
-
-" ---------------------------------------------------------------- }}}
 " vim-asterisk (enhanced *) {{{
 
 " Use z (stay) behavior as default
@@ -1517,25 +1443,6 @@ endfunction
 
 " Keep cursor position across matches
 let g:asterisk#keeppos = 1
-
-" ---------------------------------------------------------------- }}}
-" incsearch {{{
-
-" incsearch.vim
-let g:PlugConfig['incsearch.vim'] = 's:init_incsearch'
-function! s:init_incsearch() abort
-  if !has('patch-8.0.1238')
-    map /  <Plug>(incsearch-forward)
-    map ?  <Plug>(incsearch-backward)
-  endif
-  " forward search, but does not move cursor during incsearch
-  map g/ <Plug>(incsearch-stay)
-endfunction
-
-" incsearch-fuzzy.vim
-map z/ <Plug>(incsearch-fuzzy-/)
-map z? <Plug>(incsearch-fuzzy-?)
-map zg/ <Plug>(incsearch-fuzzy-stay)
 
 " ---------------------------------------------------------------- }}}
 " highlightedyank (neovim) {{{
@@ -1555,14 +1462,6 @@ endif
 
 
 " ---------------------------------------------------------------- }}}
-" vim-quickhl {{{
-
-nmap <leader>* <Plug>(quickhl-manual-this)
-xmap <leader>* <Plug>(quickhl-manual-this)
-nmap <leader>8 <Plug>(quickhl-manual-reset)
-xmap <leader>8 <Plug>(quickhl-manual-reset)
-
-" ---------------------------------------------------------------- }}}
 " vim-highlightedundo {{{
 
 let g:PlugConfig['vim-highlightedundo'] = 's:init_highlightedundo'
@@ -1576,39 +1475,6 @@ function! s:init_highlightedundo() abort
   let g:highlightedundo#highlight_duration_delete = 500
   let g:highlightedundo#highlight_duration_add = 700
 endfunction
-
-" ---------------------------------------------------------------- }}}
-" which-key.nvim {{{
-
-" Make timeout delay slightly smaller (before popup appears), default is 1000ms
-set timeoutlen=500
-
-if has('nvim')
-  let g:PlugConfig['which-key.nvim'] = 's:init_which_key'
-  function! s:init_which_key() abort
-    autocmd User LazyInit call s:setup_which_key()
-  endfunction
-endif
-function! s:setup_which_key()
-lua << EOF
-  require("which-key").setup {
-    window = {
-      border = "single",
-      winblend = 10,
-    },
-    layout = {
-      height = { min = 4, max = 8 },
-    }
-  }
-EOF
-endfunction
-
-" appearances for which-key
-function! HighlightsWhichkey() abort
-  hi WhichKeyFloat  guibg=#1a2a3a
-endfunction
-call RegisterHighlights('HighlightsWhichkey')
-
 
 " ---------------------------------------------------------------- }}}
 " vim-commentary {{{
@@ -1649,42 +1515,6 @@ let g:EditorConfig_core_mode = 'vim_core'
 "let g:EditorConfig_core_mode = 'python_external'
 "let g:EditorConfig_core_mode = 'external_command'
 
-
-" ---------------------------------------------------------------- }}}
-" nvim-colorizer {{{
-" https://github.com/NvChad/nvim-colorizer.lua#customization
-
-autocmd User LazyInit      call s:setup_nvim_colorizer()
-function! s:setup_nvim_colorizer() abort
-  if !has('nvim') | return | endif
-lua << EOF
-  if not pcall(require, 'colorizer') then return end
-  require('colorizer').setup {
-    user_default_options = {
-      RGB = true,
-      RRGGBB = true,
-      RRGGBBAA = true,
-      names = true,
-    },
-    filetypes = {
-      '*';
-      css = { css = true, tailwind = true };
-      scss = { css = true, tailwind = true };
-      sass = { css = true, sass = { enable = true, parsers = {"css"} } };
-      less = { css = true, tailwind = true };
-      html = { css = true, tailwind = true };
-      javascript = { css = true, tailwind = true };
-      -- Update color values even if buffer is not focused (for cmp menu, etc.)
-      cmp_docs = { always_update = true };
-      cmp_menu = { always_update = true };
-    },
-    buftypes = {
-      '*',
-      '!prompt';
-    }
-  }
-EOF
-endfunction
 
 " ---------------------------------------------------------------- }}}
 " Airline {{{
@@ -1858,9 +1688,6 @@ function! AsyncrunQuickfixCtrlC() abort
   endif
 endfunction
 
-" }}}
-
-
 " ---------------------------------------------------------------- }}}
 " errormarker.vim (quickfix to signs) {{{
 
@@ -1967,8 +1794,6 @@ endif
 
 " :Buffers => Jump to the existing window if possible
 let g:fzf_vim.buffers_jump = 1
-
-" }}}
 
 function! s:get_git_workdir(path)
   let curr = fnamemodify(expand(a:path), ':p')
@@ -2209,11 +2034,11 @@ let s:sed_highlight_path_last_segment = 'sed -e "s#\(.*\)/\(.*\)#\1/$(tput setaf
 " vim-floaterm {{{
 
 let g:floaterm_position = 'center'
-let g:floaterm_background = '#1a2a31'
+let g:floaterm_background = '#0c1418'
 
 function! HighlightsFloaterm() abort
-  hi Floaterm         guibg=#1a2a31
-  hi FloatermBorder   guibg=#1a2a31 guifg=white
+  hi Floaterm         guibg=#0c1418
+  hi FloatermBorder   guibg=#0c1418 guifg=white
   hi def link FloatermNF        Floaterm
   hi def link FloatermNC        Floaterm
   hi def link FloatermBorderNF  FloatermBorder
@@ -2303,13 +2128,15 @@ set wildcharm=<Tab>
 if has('nvim')
   augroup WilderLazyInit
     autocmd!
-    autocmd CmdlineEnter * ++once call s:check_wilder_rplugins()
     autocmd CmdlineEnter * ++once call s:setup_wilder()
   augroup END
 endif
 function! s:setup_wilder() abort
-  " If python3 host has failed to load, do not activate wilder.
+  " If python3 host has failed to load or wilder is disabled, do not activate wilder.
   if !luaeval('require("config.pynvim")()') | return | endif
+  if !luaeval('vim.F.npcall(require, "wilder") and true') | return | endif
+
+  call s:check_wilder_rplugins()
 
   " only / and ? are enabled by default
   try
@@ -2420,7 +2247,7 @@ function! s:check_wilder_rplugins() abort
   " so we first force loading it even before wilder initialization is complete.
   doautocmd FuncUndefined _wilder_init
   if !exists('*_wilder_init') && luaeval('require("config.pynvim")()')  " has('python3')
-    UpdateRemotePlugins
+    lua require("utils.plug_utils").UpdateRemotePlugins(nil, { force = true })
     let l:msg = ':UpdateRemotePlugins has been executed. Please restart neovim.'
     echohl WarningMsg | echom l:msg | echohl None
     call VimNotify(l:msg, 'error', {'timeout': 30 * 1000, 'title': 'wilder'})
@@ -2486,57 +2313,6 @@ if !exists(':Neotree')  " fallback to NERDTree for vanilla vim
 end
 
 " ---------------------------------------------------------------- }}}
-" nvim-tree.lua {{{
-" DEPRECATED: Use neo-tree.nvim instead.
-
-function! s:setup_nvimtree() abort
-  " Ignore some files
-  let g:nvim_tree_ignore = ['.git', '__node_modules__',
-        \ '__pycache__', '.pytest_cache', '.mypy_cache', '.cache',
-        \ ]
-  let g:nvim_tree_gitignore = 1
-  " Use trailing '/' for folders
-  let g:nvim_tree_add_trailing = 1
-  " Show indent markers (vertical segments)
-  let g:nvim_tree_indent_markers = 1
-  " Don't ask which window should be picked to open files.
-  let g:nvim_tree_disable_window_picker = 1
-
-lua << EOF
-  -- Config: https://github.com/kyazdani42/nvim-tree.lua#setup
-  if not pcall(require, 'nvim-tree') then return end
-  local tree_cb = require('nvim-tree.config').nvim_tree_callback
-  require('nvim-tree').setup {
-    -- Update the location cursor whenever entering a buffer
-    update_focused_file = {
-      enable = true,
-    },
-    -- Custom Keymappings
-    view = {
-      mappings = {
-        list = {
-          { key = "?",                            cb = tree_cb("toggle_help") },
-          { key = "r",                            cb = tree_cb("refresh") },
-        }
-      }
-    }
-  }
-EOF
-endfunction
-
-let g:PlugConfig['nvim-tree.lua'] = 's:init_nvim_tree'
-function! s:init_nvim_tree() abort
-  autocmd User LazyInit      call s:setup_nvimtree()
-  nmap <leader>E  :NvimTreeToggle<CR>
-
-  " On focus, refresh automatically
-  augroup NvimTreeCustomization
-    autocmd!
-    autocmd BufEnter NvimTree*   :NvimTreeRefresh
-  augroup end
-endfunction
-
-" ---------------------------------------------------------------- }}}
 " Voom {{{
 
 let g:voom_ft_modes = {'pandoc': 'markdown', 'tex': 'latex'}
@@ -2584,7 +2360,7 @@ nmap ga <Plug>(EasyAlign)
 let g:PlugConfig['indent-blankline.nvim'] = 's:init_indent_blankline'
 function! s:init_indent_blankline() abort
   let g:indent_blankline_char = '┊'
-  let g:indent_blankline_filetype_exclude = ['help', 'NvimTree', 'pandoc']
+  let g:indent_blankline_filetype_exclude = ['help', 'NvimTree', 'markdown']
   let g:indent_blankline_buftype_exclude = ['terminal']
   let g:indent_blankline_show_first_indent_level = v:false
 endfunction
@@ -2606,7 +2382,7 @@ function! s:init_indentline_legacy() abort
   let g:indentLine_conceallevel = 1
 
   " conceal values might not work well for tex files (hides some characters)
-  let g:indentLine_fileTypeExclude = ['tex', 'markdown', 'pandoc', 'NvimTree', 'floaterm', 'tagbar']
+  let g:indentLine_fileTypeExclude = ['tex', 'markdown', 'markdown', 'NvimTree', 'floaterm', 'tagbar']
 
   " command alias
   command! -nargs=0 ToggleIndentLines   :IndentLinesToggle
@@ -2624,59 +2400,10 @@ let g:scrollview_signs_on_startup = ['']
 
 " Disable scrollbar on some filetypes
 " (to avoid which can cause floating-window related errors)
-let g:scrollview_excluded_filetypes = ['vim-plug', 'GV', 'git', 'neo-tree']
-
-" ---------------------------------------------------------------- }}}
-" pretty-fold {{{
-
-" Note: deprecated in favor of nvim-ufo
-" (see ~/.config/nvim/lua/config/folding.lua)
-
-let g:PlugConfig['pretty-fold.nvim'] = 's:init_pretty_fold'
-function! s:init_pretty_fold() abort
-  autocmd User LazyInit  call s:setup_prettyfold()
-endfunction
-function! s:setup_prettyfold() abort
-lua << EOF
-  -- Configuration
-  -- https://github.com/anuvyklack/pretty-fold.nvim#foldtext-configuration
-  local number_of_folded_lines = function()
-    return string.format('%3d lines', vim.v.foldend - vim.v.foldstart + 1)
-  end
-  local rep_fill_char = function(times)
-    return function(config) return config.fill_char:rep(times) end
-  end
-  require("pretty-fold").setup {
-    fill_char = '╶',
-    sections = {
-      left = {
-        'content',
-      },
-      right = {
-         ' ', 'number_of_folded_lines', ' ', rep_fill_char(3),
-      }
-    },
-    process_comment_signs = false,
-  }
-
-  -- Preview closed folds
-  -- https://github.com/anuvyklack/pretty-fold.nvim#preview
-  -- Note: help 'foldopen' to specify when fold will be opened upon actions
-  require('pretty-fold.preview').setup {
-    border = 'none',
-
-    -- Disable default keybindings (h/l) which are confusing. Use `zp` instead
-    key = false,
-    default_keybindings = false,
-  }
-
-  _G.PreviewFold = function()
-    require('pretty-fold.preview').show_preview()
-  end
-EOF
-  command! -nargs=0 PreviewFold :lua _G.PreviewFold()
-  nnoremap zp <cmd>PreviewFold<CR>
-endfunction
+let g:scrollview_excluded_filetypes = [
+      \ 'vim-plug', 'git', 'fugitiveblame',
+      \ 'neo-tree',
+      \ ]
 
 " ---------------------------------------------------------------- }}}
 " UltiSnips {{{
@@ -2702,36 +2429,6 @@ call CommandAlias('EditSnippets', 'UltiSnipsEdit', v:true)
 call CommandAlias('USE', 'UltiSnipsEdit', v:false)
 
 " ---------------------------------------------------------------- }}}
-" vim-pandoc {{{
-
-let g:PlugConfig['vim-pandoc'] = 's:init_pandoc'
-function! s:init_pandoc() abort
-
-  " disable automatic folding
-  let g:pandoc#modules#disabled = ['folding']
-
-  " disable conceals
-  let g:pandoc#syntax#conceal#use = 0
-
-  " disable spell check
-  let g:pandoc#spell#enabled = 0
-
-  " Do not map <leader>{nr, rg, rb} by default
-  let g:pandoc#keyboard#use_default_mappings = 0
-
-endfunction
-
-" ---------------------------------------------------------------- }}}
-" vim-verdict {{{
-
-" cooperative mode required to make it work with LSP engines, YCM, etc.
-let g:Verdin#cooperativemode = 1
-
-" ---------------------------------------------------------------- }}}
-" echodoc.vim {{{
-let g:echodoc#enable_at_startup = 1
-
-" ---------------------------------------------------------------- }}}
 " semshi {{{
 
 " Disable diagonostics sign in favor of LSP.
@@ -2742,18 +2439,6 @@ let g:semshi#error_sign = 0
 " See also: config/git.lua
 
 let g:fugitive_legacy_commands = 0
-
-" Custom Fugitive Commands
-" GitThreeWayDiff: open a 3-way diff window among {HEAD, index, working copy}
-command! GitThreeWayDiff        call GitThreeWayDiff()
-function! GitThreeWayDiff() abort
-  diffoff!   " turn off diff for all windows
-  let current_win = win_getid()
-  aboveleft Gvdiff HEAD         " [left]   HEAD
-  call win_gotoid(current_win)
-  aboveleft Gvdiff              " [middle] stage/index
-  call win_gotoid(current_win)  " [right]  working copy
-endfunction
 
 " command aliases
 command! -nargs=* GCommit   call s:GCommit('<mods>', <q-args>)
@@ -2809,10 +2494,6 @@ augroup FugitiveAddon
   " [,gd] diffvsplit
   autocmd FileType fugitive    nmap     <buffer> <leader>gd  dv
 
-  " when git index is updated via hunk stage operation, reload fugitive buffers
-  if exists('*timer_start')  " 7.4.1578+
-    autocmd User GitGutterStage  call timer_start(0, function('ReloadFugitiveBlobs'))
-  endif
 augroup END
 
 function! ReloadFugitiveBlobs(...) abort
@@ -2862,21 +2543,6 @@ endfunction
 " see ~/.config/nvim/lua/config/git.lua
 
 " ---------------------------------------------------------------- }}}
-" vim-gitgutter (legacy) {{{
-
-" For colors for gitgutter signs, see ~/.vim/colors/xoria256-wook.vim
-
-" Another alias for adding or staging hunk (similar as <leader>ga).
-" for other keys (e.g <leader>hu, <leader>hp), please see
-"  :help gitgutter-<Leader>
-
-let g:PlugConfig['vim-gitgutter'] = 's:init_gitgutter'
-function! s:init_gitgutter() abort
-  nmap <leader>ha  <Plug>(GitGutterStageHunk)
-  nmap <leader>hh  :GitGutterLineHighlightsToggle<CR>
-endfunction
-
-" ---------------------------------------------------------------- }}}
 " git-messenger {{{
 
 " map <C-O>/<C-I> to jumping to older and Older(recent) commits,
@@ -2919,7 +2585,7 @@ let g:tagbar_show_visibility = 0
 
 " ---------------------------------------------------------------- }}}
 
-" Source all PlugConfig for 'enabled' plugins
+" Source all PlugConfig for 'enabled' plugins {{{
 let g:PlugConfig = map(g:PlugConfig, 'funcref(v:val)')
 function! s:source_PlugConfig() abort
   " for vim-plug
@@ -2929,6 +2595,7 @@ function! s:source_PlugConfig() abort
     endif
   endfor
 endfunction | call s:source_PlugConfig()
+" }}}
 
 " }}}
 """""""""""""""""""""""""""""""""""""""""

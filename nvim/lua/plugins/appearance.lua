@@ -10,27 +10,18 @@ return {
   -- statusline
   Plug 'nvim-lualine/lualine.nvim' {
     event = 'UIEnter',  -- load the plugin earlier than VimEnter, before drawing the UI, to avoid flickering transition
+    init = function()
+      -- lualine initializes lazily; to hide unwanted text changes in the statusline,
+      -- draw an empty statusline with no text before the first draw of lualine
+      vim.o.statusline = ' '
+    end,
     config = require('config.statusline').setup,
   };
 
   -- tabline
   Plug 'mg979/vim-xtabline' {
     event = 'UIEnter',  -- load the plugin before drawing UI to not flicker; it takes only 2-3 ms
-    init = function()
-      vim.g.xtabline_settings = {
-        -- Use 'tab' as the default xtabline mode
-        -- since we use global statusline (laststatus = 3)
-        tabline_modes = { 'tabs', 'buffers', 'arglist' },
-        -- always show the current xtabline mode
-        mode_labels = 'all',
-      }
-    end,
-    config = function()
-      require("utils.rc_utils").RegisterHighlights(function()
-        vim.api.nvim_set_hl(0, 'XTNum',    { bg = 'black',   fg='white', })
-        vim.api.nvim_set_hl(0, 'XTNumSel', { bg = '#1f1f3d', fg='white', bold = true })
-        vim.api.nvim_set_hl(0, 'XTCorner', { link = 'Special' })
-      end)
-    end,
+    init = require("config.tabline").init_xtabline,
+    config = require("config.tabline").setup_xtabline,
   };
 }

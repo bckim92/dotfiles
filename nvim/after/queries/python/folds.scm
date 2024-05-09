@@ -1,41 +1,10 @@
-; @see https://github.com/nvim-treesitter/nvim-treesitter/pull/1451
-; @see https://tree-sitter.github.io/tree-sitter/using-parsers#query-syntax
+;; extends
 
-; Default python folding queries.
-[
-  (function_definition)
-  (class_definition)
-] @fold
-
-[
-  (while_statement)
-  (for_statement)
-  (if_statement)
-  (with_statement)
-  (try_statement)
-
-  (import_from_statement)
-  (parameters)
-  (argument_list)
-
-  (parenthesized_expression)
-  (generator_expression)
-  (list_comprehension)
-  (set_comprehension)
-  (dictionary_comprehension)
-
-  (tuple)
-  (list)
-  (set)
-  (dictionary)
-
-  (string)
-] @fold
-
-
-; Advanced & Experimental folding customization
-
-; Fold consecutive top-level import statements
+; 🚧 Fold a maximially consecutive top-level import statements.
+; NOTE: This query is a hack until a upstream bug is fixed: neovim/neovim#17060
+; where (node)+ quantifiers are not captured properly as a single group.
+;   see potential fix: neovim/neovim#17099 -> neovim/neovim#24738
+;   also relevant: tree-sitter/tree-sitter#2468
 (module
   . (comment)*
   . (expression_statement)?   ; an optional docstring at the very first top

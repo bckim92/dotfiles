@@ -20,6 +20,10 @@ end
 -- Config starts!
 -- https://wezfurlong.org/wezterm/config/lua/config/index.html
 
+function M.setup_general()
+  config.term = 'wezterm'
+end
+
 function M.setup_appearances()
   -- Appearances: https://wezfurlong.org/wezterm/config/appearance.html
   config.adjust_window_size_when_changing_font_size = false
@@ -32,14 +36,27 @@ end
 
 function M.setup_fonts()
   -- Fonts: https://wezfurlong.org/wezterm/config/fonts.html
+  -- $ wezterm ls-fonts --text "(Unicode)" to test font fallback
   config.font = wezterm.font_with_fallback {
-    { family = 'JetBrainsMono NFM', weight = 'Light' },
-    { family = 'JetBrainsMono Nerd Font Mono', weight = 'Light' },
+    { family = 'JetBrainsMono Nerd Font Mono', weight = 'Regular' },
+    { family = 'JetBrainsMono NFM', weight = 'Regular' }, -- v3.1.0 only
     'Hack Nerd Font Mono',
-    'Monaco',
     'Apple SD Gothic Neo',  -- for Korean (한글) letters
-    'Apple Color Emoji'  -- Use macOS emoji, not Noto Color Emoji
+    'Apple Color Emoji',  -- Use macOS emoji, not Noto Color Emoji
+    'Menlo',  -- Some unicodes as fallback
   }
+  -- Customize fonts for bold, italic, bold_italic, etc.
+  -- https://wezfurlong.org/wezterm/config/lua/config/font_rules.html
+  config.font_rules = {
+    {
+      intensity = 'Bold',
+      italic = false,
+      font = wezterm.font_with_fallback {
+        { family = 'JetBrainsMono Nerd Font Mono', weight = 'Bold' },
+      }
+    },
+  }
+
   config.cell_width = 0.85
   config.line_height = 0.89
   config.font_size = 18

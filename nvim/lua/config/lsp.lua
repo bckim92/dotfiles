@@ -1,11 +1,13 @@
--------------
--- LSP config
--------------
+--------------
+--- LSP config
+--------------
 -- See 'plugins.ide' for the Plug specs
+-- nvim-cmp config has been moved to nvim/lua/config/completion.lua
 
 local M = {}
 
 -- lsp_signature
+---@diagnostic disable-next-line: unused-local
 local on_attach_lsp_signature = function(client, bufnr)
   -- https://github.com/ray-x/lsp_signature.nvim#full-configuration-with-default-values
   require('lsp_signature').on_attach({
@@ -20,14 +22,9 @@ local on_attach_lsp_signature = function(client, bufnr)
   })
 end
 
--- A callback executed when LSP engine attaches to a buffer.
----@type fun(client: lsp.Client, bufnr: number)
+--- A callback executed when LSP engine attaches to a buffer.
+---@type fun(client: vim.lsp.Client, bufnr: integer)
 local on_attach = function(client, bufnr)
-
-  -- Always use signcolumn for the current buffer
-  if vim.bo.filetype == 'python' then
-    vim.wo.signcolumn = 'yes:2'
-  end
 
   -- Activate LSP signature on attach.
   on_attach_lsp_signature(client, bufnr)
@@ -42,59 +39,90 @@ local on_attach = function(client, bufnr)
 
   -- Keybindings
   -- https://github.com/neovim/nvim-lspconfig#keybindings-and-completion
-  local function buf_set_keymap(...) vim.api.nvim_buf_set_keymap(bufnr, ...) end
-  local function buf_set_option(...) vim.api.nvim_buf_set_option(bufnr, ...) end
+  local bufmap = function(mode, lhs, rhs, opts)
+    return vim.keymap.set(mode, lhs, rhs, vim.tbl_deep_extend("force", { remap = false, buffer = true }, opts or {}))
+  end
+  local nbufmap = function(lhs, rhs, opts) return bufmap('n', lhs, rhs, opts) end
+  local function vim_cmd(x) return '<Cmd>' .. x .. '<CR>' end
   local function buf_command(...) vim.api.nvim_buf_create_user_command(bufnr, ...) end
-  local opts = { noremap = true, silent = true }
+
+  -- keymap for <count>gt (tabn) or gt (lsp)
+  local gt_action = function(lsp_cmd)
+    return function()
+      local count = vim.v.count
+      if count > 0 then vim.cmd(('tabn %d'):format(count))
+      else vim.cmd(lsp_cmd)
+      end
+    end
+  end
 
   -- See `:help vim.lsp.*` for documentation on any of the below functions
-  buf_set_keymap('n', 'gD', '<cmd>lua vim.lsp.buf.declaration()<CR>', opts)
-  if pcall(require, 'telescope') then
-    buf_set_keymap('n', 'gr', '<cmd>Telescope lsp_references<CR>', opts)
-    buf_set_keymap('n', 'gd', '<cmd>Telescope lsp_definitions<CR>', opts)
-    buf_set_keymap('n', 'gi', '<cmd>Telescope lsp_implementations<CR>', opts)
-    buf_set_keymap('n', 'gt', '<cmd>Telescope lsp_type_definitions<CR>', opts)
+  if pcall(require, 'fzf-lua') then
+    nbufmap('gr', vim_cmd 'lua require("fzf-lua").lsp_references { jump_to_single_result = true, silent = true}')
+    nbufmap('gd', vim_cmd 'lua require("fzf-lua").lsp_definitions { jump_to_single_result = true, silent = true }')
+    nbufmap('gi', vim_cmd 'lua require("fzf-lua").lsp_implementations { jump_to_single_result = true, silent = true }')
+    nbufmap('gt', gt_action('lua require("fzf-lua").lsp_typedefs { jump_to_single_result = true, silent = true }'))
   else
-    buf_set_keymap('n', 'gd', '<cmd>lua vim.lsp.buf.definition()<CR>', opts)
-    buf_set_keymap('n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
-    buf_set_keymap('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>', opts)
-    buf_set_keymap('n', 'gt', '<cmd>lua vim.lsp.buf.type_definition()<CR>', opts)
+    nbufmap('gd', vim_cmd 'lua vim.lsp.buf.definition()')
+    nbufmap('gr', vim_cmd 'lua vim.lsp.buf.references()')
+    nbufmap('gi', vim_cmd 'lua vim.lsp.buf.implementation()')
+    nbufmap('gt', gt_action('lua vim.lsp.buf.type_definition()'))
   end
-  buf_set_keymap('n', '[d', '<cmd>lua vim.diagnostic.goto_prev()<CR>', opts)
-  buf_set_keymap('n', ']d', '<cmd>lua vim.diagnostic.goto_next()<CR>', opts)
-  buf_set_keymap('n', '[e', '<cmd>lua vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.ERROR })<CR>', opts)
-  buf_set_keymap('n', ']e', '<cmd>lua vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })<CR>', opts)
-  --buf_set_keymap('n', '<space>wa', '<cmd>lua vim.lsp.buf.add_workspace_folder()<CR>', opts)
-  --buf_set_keymap('n', '<space>wr', '<cmd>lua vim.lsp.buf.remove_workspace_folder()<CR>', opts)
-  --buf_set_keymap('n', '<space>wl', '<cmd>lua print(vim.inspect(vim.lsp.buf.list_workspace_folders()))<CR>', opts)
-  buf_set_keymap('n', '<leader>rn', '<cmd>lua vim.lsp.buf.rename()<CR>', opts)
-  buf_set_keymap('n', '<leader>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
-  --buf_set_keymap('n', '<space>e', '<cmd>lua vim.lsp.diagnostic.show_line_diagnostics()<CR>', opts)
-  --buf_set_keymap('n', '<space>q', '<cmd>lua vim.lsp.diagnostic.set_loclist()<CR>', opts)
-  --buf_set_keymap("n", "<space>f", "<cmd>lua vim.lsp.buf.formatting()<CR>", opts)
+  nbufmap('gD', vim_cmd 'lua vim.lsp.buf.declaration()')
+  nbufmap('[d', vim_cmd 'lua vim.diagnostic.goto_prev()',
+    { desc = 'goto previous diagnostic item' })
+  nbufmap(']d', vim_cmd 'lua vim.diagnostic.goto_next()',
+    { desc = 'goto next diagnostic item' })
+  nbufmap('[e', vim_cmd 'lua vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.ERROR })',
+    { desc = 'goto previous error' })
+  nbufmap(']e', vim_cmd 'lua vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })',
+    { desc = 'goto next error' })
+  --nbufmap('<space>wa', vim_cmd 'lua vim.lsp.buf.add_workspace_folder()')
+  --nbufmap('<space>wr', vim_cmd 'lua vim.lsp.buf.remove_workspace_folder()')
+  --nbufmap('<space>wl', vim_cmd 'lua print(vim.inspect(vim.lsp.buf.list_workspace_folders()))')
+  nbufmap('<leader>rn', vim_cmd 'lua vim.lsp.buf.rename()')
+  bufmap({'n', 'v'}, '<leader>ca', '<cmd>CodeActions<CR>')
+  --nbufmap('<space>e', vim_cmd 'lua vim.lsp.diagnostic.show_line_diagnostics()')
+  --nbufmap('<space>q', vim_cmd 'lua vim.lsp.diagnostic.set_loclist()')
+  --nbufmap('<space>f', vim_cmd 'ua vim.lsp.buf.formatting()')
 
   -- Commands
   buf_command("LspRename", function(opt)
     vim.lsp.buf.rename(opt.args ~= "" and opt.args or nil)
   end, { nargs = '?', desc = "Rename the current symbol at the cursor." })
 
+  buf_command("CodeActions", function(_)
+    if pcall(require, "fzf-lua.previewer.codeaction") then
+      if vim.fn.executable("delta") == 0 then
+        vim.notify_once("delta (git-delta) not found. Please install delta to enable preview.", vim.log.levels.WARN)
+      end
+      require("fzf-lua").lsp_code_actions()  -- see config/fzf.lua
+    else
+      return vim.lsp.buf.code_action()
+    end
+  end, { nargs = 0, desc = "Code Actions (fzf-lua with preview)." })
+  vim.fn.CommandAlias("CA", "CodeActions")
+
   -- inlay hints (experimental), need to turn it on manually
   if client.server_capabilities.inlayHintProvider and vim.fn.has('nvim-0.10') > 0 then
     local inlay = function(enable)
       if enable == 'toggle' then
-        enable = not vim.lsp.inlay_hint.is_enabled(bufnr)
+        enable = not vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
       end
-      vim.lsp.inlay_hint.enable(bufnr, enable)
+      vim.lsp.inlay_hint.enable(enable, { bufnr = bufnr })
     end
     buf_command("InlayHintsToggle", function(_) inlay('toggle') end,
       { nargs = 0, desc = "Toggle inlay hints."})
     buf_command("ToggleInlayHints", "InlayHintsToggle", {})
     vim.fn.CommandAlias("ToggleInlayHints", "InlayHintsToggle")
+    -- Toggling inlay hints: <leader>I or <Ctrl-Alt-Space>
+    vim.keymap.set('n', '<leader>I', '<cmd>InlayHintsToggle<CR>', { buffer = true })
+    vim.keymap.set('n', '<M-C-Space>', '<cmd>InlayHintsToggle<CR>', { buffer = true })
   end
 
 end
 
--- Add global keymappings for LSP actions
+--- Add global keymappings for LSP actions
 function M._setup_lsp_keymap()
   vim.cmd [[
     " F3, F12: goto definition
@@ -134,8 +162,8 @@ local auto_lsp_servers = {
   ['lemminx'] = true,  -- xml
 }
 
--- Refresh or force-update mason-registry if needed (e.g. pkgs are missing)
--- and execute the callback asynchronously.
+--- Refresh or force-update mason-registry if needed (e.g. pkgs are missing)
+--- and execute the callback asynchronously.
 local function maybe_refresh_mason_registry_and_then(callback, opts)
   local mason_registry = require("mason-registry")
   local function _notify(msg, opts)
@@ -163,7 +191,7 @@ end
 
 function M._setup_mason()
   -- Mason: LSP Auto installer
-  -- https://github.com/williamboman/mason.nvim#default-configuration
+  ---@source $VIMPLUG/mason.nvim/lua/mason/settings.lua
   require("mason").setup {
     ui = {
       border = "rounded",
@@ -178,7 +206,7 @@ function M._setup_mason()
   maybe_refresh_mason_registry_and_then(M._ensure_mason_installed)
 end
 
--- Install auto_lsp_servers on demand (FileType)
+--- Install auto_lsp_servers on demand (FileType)
 function M._ensure_mason_installed()
   local augroup = vim.api.nvim_create_augroup('mason_autoinstall', { clear = true })
   local lspconfig_to_package = require("mason-lspconfig.mappings.server").lspconfig_to_package
@@ -217,15 +245,15 @@ function M._ensure_mason_installed()
 
   -- Since this works asynchronously, apply on the already opened buffer as well
   vim.tbl_map(function(buf)
-    local valid = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_option(buf, 'buflisted')
+    local valid = vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buflisted
     if not valid then return end
     local handler = ft_handler[vim.bo[buf].filetype]
     if handler then handler() end
   end, vim.api.nvim_list_bufs())
 end
 
----Create the default capabilities to use for LSP server configuration.
----@type fun(): lsp.ClientCapabilities
+--- Create the default capabilities to use for LSP server configuration.
+---@return lsp.ClientCapabilities
 function M.lsp_default_capabilities()
   -- Use default vim.lsp capabilities and apply some tweaks on capabilities.completion for nvim-cmp
   local capabilities = vim.tbl_deep_extend("force",
@@ -244,20 +272,22 @@ end
 -- Optional and additional LSP setup options other than (common) on_attach, capabilities, etc.
 -- see(config): https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md
 -- see $VIMPLUG/nvim-lspconfig/lua/lspconfig/server_configurations/
----@type table<lspserver_name, table | fun():table>
+---@type table<lspserver_name, false | table | fun():(table|false)>
 local lsp_setup_opts = {}
 M.lsp_setup_opts = lsp_setup_opts
 
 ---@see lsp.ClientConfig :help vim.lsp.start_client()
----@type table<lspserver_name, fun(client: lsp.Client, init_result: table)>
+---@type table<lspserver_name, fun(client: vim.lsp.Client, init_result: table)>
 local on_init = {}
 M.on_init = on_init
 
-lsp_setup_opts['pyright'] = function()
+---@param setup_name 'python'|'basedpyright' for pyright, use 'python'.
+local pyright_opts = function(setup_name)
   return {
     -- https://github.com/microsoft/pyright/blob/main/docs/settings.md
+    -- https://detachhead.github.io/basedpyright/
     settings = {
-      python = {
+      [setup_name] = {
         analysis = {
           typeCheckingMode = "basic",
         },
@@ -268,9 +298,27 @@ lsp_setup_opts['pyright'] = function()
   }
 end
 
+lsp_setup_opts['basedpyright'] = function()
+  -- basedpyright: experimental drop-in replacement of pyright (that supports inlay hints!)
+  -- To use it, simply install it with :Mason. When installed, basedpyright will be enabled
+  -- in place of pyright; otherwise, fallback to the standard pyright.
+  lsp_setup_opts['pyright'] = false
+  return pyright_opts('basedpyright')
+end
+
+lsp_setup_opts['pyright'] = function()
+  -- Do not setup pyright when basedpyright is installed.
+  -- TODO: remove mason dependency.
+  if require('mason-registry').is_installed('basedpyright') then
+    return false
+  end
+  return pyright_opts('python')
+end
+
 lsp_setup_opts['ruff_lsp'] = function()
   local init_options = {
-    -- https://github.com/charliermarsh/ruff-lsp#settings
+    -- https://github.com/astral-sh/ruff-lsp#settings
+    -- https://github.com/astral-sh/ruff-lsp/blob/main/ruff_lsp/server.py
     settings = {
       fixAll = true,
       organizeImports = false,  -- let isort take care of organizeImports
@@ -282,6 +330,7 @@ lsp_setup_opts['ruff_lsp'] = function()
         "E114", -- indentation-with-invalid-multiple-comment
         "E402", -- module-import-not-at-top-of-file
         "E501", -- line-too-long
+        "E702", -- multiple-statements-on-one-line-semicolon
         "E731", -- lambda-assignment
       }, ',') },
     },
@@ -351,7 +400,6 @@ on_init['lua_ls'] = function(client, _)
   -- due to delayed execution (see neovim/nvim-lspconfig#2542)
   if client.server_capabilities then
     client.server_capabilities.documentFormattingProvider = false
-    client.server_capabilities.semanticTokensProvider = false  -- turn off semantic tokens
   end
 end
 
@@ -376,7 +424,7 @@ lsp_setup_opts['yamlls'] = {
   }
 }
 
--- Call lspconfig[...].setup for all installed LSP servers with common opts
+--- Call lspconfig[...].setup for all installed LSP servers with common opts
 local function setup_lsp(lsp_name)
   local common_opts = {
     on_init = on_init[lsp_name],
@@ -386,12 +434,14 @@ local function setup_lsp(lsp_name)
 
   -- Configure lua_ls to support neovim Lua runtime APIs
   if lsp_name == 'lua_ls' then
-    local dotfiles_path = tostring(vim.fn.expand('~/.dotfiles'))
+    local resolve_path = function(p) return assert(vim.loop.fs_realpath(vim.fs.normalize(p))) end
+    local dotfiles_path = resolve_path('$HOME/.dotfiles')
     require("neodev").setup {
       -- Always add neovim plugins into lua_ls library, for any lua files (even if they are not nvim configs)
       -- see also: neodev.lsp.on_new_config(...), folke/neodev.nvim#158
       override = function(root_dir, library)
-        if string.find(root_dir, dotfiles_path, 1, true) then
+        root_dir = resolve_path(root_dir)
+        if vim.startswith(root_dir, dotfiles_path) then
           library.enabled = true
           library.plugins = true
         end
@@ -399,9 +449,20 @@ local function setup_lsp(lsp_name)
     }
   end
 
-  local opts = M.lsp_setup_opts[lsp_name] or {}
+  local opts = M.lsp_setup_opts[lsp_name]
+  if opts == false then
+    -- Explicitly configured to disable this LSP. Stop.
+    return
+  end
+
+  opts = opts or {} -- 'nil' means using the default opts
   if type(opts) == 'function' then
     opts = opts()
+  end
+
+  if opts == false then
+    -- Explicitly configured to disable this LSP (after evaluation). Stop.
+    return
   end
 
   -- Merge with lang-specific options
@@ -415,7 +476,7 @@ local attach_lsp_to_existing_buffers = vim.schedule_wrap(function()
   -- this can be easily achieved by firing an autocmd event for the open buffers.
   -- See lspconfig.configs (config.autostart)
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    local valid = vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_option(bufnr, 'buflisted')
+    local valid = vim.api.nvim_buf_is_valid(bufnr) and vim.bo[bufnr].buflisted
     if valid and vim.bo[bufnr].buftype == "" then
       local augroup_lspconfig = vim.api.nvim_create_augroup('lspconfig', { clear = false })
       vim.api.nvim_exec_autocmds("FileType", { group = augroup_lspconfig, buffer = bufnr })
@@ -467,9 +528,10 @@ function M._setup_lspconfig()
   ]]
 end
 
--------------------------
--- LSP Handlers (general)
--------------------------
+
+--------------------------
+--- LSP Handlers (general)
+--------------------------
 function M._setup_lsp_handlers()
   -- :help lsp-method
   -- :help lsp-handler
@@ -482,16 +544,16 @@ function M._setup_lsp_handlers()
     local bufnr, winnr = lsp_handlers_hover(err, result, ctx, config)
     if winnr ~= nil then
       -- opacity/alpha for hover window
-      vim.api.nvim_win_set_option(winnr, "winblend", 10)
+      vim.wo[winnr].winblend = 10
     end
     return bufnr, winnr
   end
 end
 
 
-------------------
--- LSP diagnostics
-------------------
+-------------------
+--- LSP diagnostics
+-------------------
 function M._setup_diagnostic()
   local icons = {
     [vim.diagnostic.severity.ERROR] = "✘",
@@ -501,20 +563,28 @@ function M._setup_diagnostic()
   }
 
   -- Customize how to show diagnostics:
-  -- @see https://github.com/neovim/nvim-lspconfig/wiki/UI-customization
-  -- @see https://github.com/neovim/neovim/pull/16057 for new APIs
-  -- @see :help vim.diagnostic.config()
+  -- see https://github.com/neovim/nvim-lspconfig/wiki/UI-customization
+  -- see https://github.com/neovim/neovim/pull/16057 for new APIs
+  -- see :help vim.diagnostic.config()
   vim.diagnostic.config {
+    -- Prioritize high severity more (for sign priority and virtual text order, etc.)
+    -- diagnostic signs have a base priority of 10; Error = 13, Warn = 12, Info = 11, etc.
+    severity_sort = true,
+
+    signs = {
+      text = icons,  -- neovim/neovim#26193 (0.10.0+)
+    },
+
     -- No virtual text (distracting!), show popup window on hover.
     virtual_text = {
       severity = { min = vim.diagnostic.severity.WARN },
       prefix = vim.fn.has('nvim-0.10') > 0 and
-        function(diagnostic, i, total)  ---@param diagnostic Diagnostic
+        function(diagnostic, i, total)  ---@param diagnostic vim.Diagnostic
           if total ~= nil and total > 4 and i > 4 then
             return i == 4 + 1 and string.format("⋯ (total %s):", total) or ""
           end
           return (icons[diagnostic.severity] or "") .. " "
-        end,
+        end or nil,
     },
     underline = {
       severity = { min = vim.diagnostic.severity.INFO },
@@ -526,6 +596,7 @@ function M._setup_diagnostic()
       border = 'single',
 
       -- Customize how diagnostic message will be shown: show error code.
+      ---@param diagnostic vim.Diagnostic
       format = function(diagnostic)
         -- See null-ls.nvim#632, neovim#17222 for how to pick up `code`
         local user_data
@@ -533,6 +604,7 @@ function M._setup_diagnostic()
         user_data = user_data.lsp or user_data.null_ls or user_data
         local code = (
             -- TODO: symbol is specific to pylint (will be removed)
+            ---@diagnostic disable-next-line: undefined-field
             diagnostic.symbol or diagnostic.code or
                 user_data.symbol or user_data.code
             )
@@ -560,7 +632,7 @@ function M._setup_diagnostic()
       local _, winnr = _G.LspDiagnosticsShowPopup()
       if winnr ~= nil then
         -- opacity/alpha for diagnostics
-        vim.api.nvim_win_set_option(winnr, "winblend", 20)
+        vim.wo[winnr].winblend = 20
       end
     end
   end
@@ -573,7 +645,8 @@ function M._setup_diagnostic()
   ]]
 
   -- Redefine signs (:help diagnostic-signs) and highlights (:help diagnostic-highlights)
-  do
+  -- see vim.diagnostic.config, but we still keep legacy signs because other plugins (neotree, etc.) still use them
+  do -- if vim.fn.has('nvim-0.10') == 0 then
     vim.fn.sign_define("DiagnosticSignError",  {text = icons[vim.diagnostic.severity.ERROR], texthl = "DiagnosticSignError"})
     vim.fn.sign_define("DiagnosticSignWarn",   {text = icons[vim.diagnostic.severity.WARN],  texthl = "DiagnosticSignWarn"})
     vim.fn.sign_define("DiagnosticSignInfo",   {text = icons[vim.diagnostic.severity.INFO],  texthl = "DiagnosticSignInfo"})
@@ -608,297 +681,9 @@ function M._setup_diagnostic()
   end
 end
 
----------------------------------
--- nvim-cmp: completion support
----------------------------------
--- https://github.com/hrsh7th/nvim-cmp#recommended-configuration
--- $VIMPLUG/nvim-cmp/lua/cmp/config/default.lua
-
-local has_words_before = function()
-  if vim.api.nvim_buf_get_option(0, 'buftype') == 'prompt' then
-    return false
-  end
-  local line, col = unpack(vim.api.nvim_win_get_cursor(0))
-  return col ~= 0 and vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1]:sub(col, col):match('%s') == nil
-end
-
-local truncate = function(text, max_width)
-  if #text > max_width then
-    return string.sub(text, 1, max_width) .. "…"
-  else
-    return text
-  end
-end
-
-
-local cmp_helper = {}
-
-M.setup_cmp = function()
-  local cmp = require('cmp')
-  local SelectBehavior = require('cmp.types.cmp').SelectBehavior
-  local ContextReason = require('cmp.types.cmp').ContextReason
-
-  vim.o.completeopt = "menu,menuone,noselect"
-
-  -- cmp.setup { ... }
-  -- See $VIMPLUG/nvim-cmp/lua/cmp/config/default.lua
-  local snippet = {
-    expand = function(args)
-      vim.fn["UltiSnips#Anon"](args.body)
-    end,
-  }
-  local window = {
-    documentation = {
-      border = { '╭', '─', '╮', '│', '╯', '─', '╰', '│' },
-    },
-    completion = {
-      -- Use border for the completion window.
-      border = { '┌', '─', '┐', '│', '┘', '─', '└', '│' },
-
-      -- Due to the border, move left the completion window by 1 column
-      -- so that text in the editor and on completion item can be aligned.
-      col_offset = -1,
-
-      winhighlight = 'Normal:CmpPmenu,FloatBorder:CmpPmenuBorder,CursorLine:PmenuSel,Search:None',
-    }
-  }
-  local mapping = {
-    -- See $VIMPLUG/nvim-cmp/lua/cmp/config/mapping.lua
-    ['<C-b>'] = cmp.mapping.scroll_docs(-4),
-    ['<C-f>'] = cmp.mapping.scroll_docs(4),
-    ['<C-Space>'] = cmp.mapping.complete({ reason = ContextReason.Manual }),
-    ['<C-y>'] = cmp.config.disable,
-    ['<C-e>'] = cmp.mapping.close(),
-    ['<Down>'] = cmp.mapping.select_next_item({ behavior = SelectBehavior.Select }),
-    ['<Up>'] = cmp.mapping.select_prev_item({ behavior = SelectBehavior.Select }),
-    ['<C-n>'] = cmp.mapping.select_next_item({ behavior = SelectBehavior.Insert }),
-    ['<C-p>'] = cmp.mapping.select_prev_item({ behavior = SelectBehavior.Insert }),
-    ['<CR>'] = cmp.mapping.confirm({ select = false }),
-    ['<Tab>'] = { -- see GH-880, GH-897
-      i = function(fallback) -- see GH-231, GH-286
-        if cmp.visible() then cmp.select_next_item()
-        elseif has_words_before() then cmp.complete()
-        else fallback() end
-      end,
-    },
-    ['<S-Tab>'] = {
-      i = function(fallback)
-        if cmp.visible() then cmp.select_prev_item()
-        else fallback() end
-      end,
-    },
-  }
-  local formatting = {
-    ---@param entry cmp.Entry
-    ---@param vim_item vim.CompletedItem
-    format = function(entry, vim_item)
-      -- Truncate the item if it is too long
-      vim_item.abbr = truncate(vim_item.abbr, 80)
-      -- fancy icons and a name of kind
-      pcall(function()  -- protect the call against potential API breakage (lspkind GH-45).
-        local lspkind = require("lspkind")
-        vim_item.kind_symbol = (lspkind.symbolic or lspkind.get_symbol)(vim_item.kind)
-        vim_item.kind = " " .. vim_item.kind_symbol .. " " .. vim_item.kind
-      end)
-
-      -- The 'menu' section: source, detail information (lsp, snippet), etc.
-      -- set a name for each source (see the sources section below)
-      vim_item.menu = ({
-        buffer        = "Buffer",
-        nvim_lsp      = "LSP",
-        ultisnips     = "",
-        nvim_lua      = "Lua",
-        latex_symbols = "Latex",
-      })[entry.source.name] or string.format("%s", entry.source.name)
-
-      -- highlight groups for item.menu
-      vim_item.menu_hl_group = ({
-        buffer = "CmpItemMenuBuffer",
-        nvim_lsp = "CmpItemMenuLSP",
-        path = "CmpItemMenuPath",
-        ultisnips = "CmpItemMenuSnippet",
-      })[entry.source.name]  -- default is CmpItemMenu
-
-      -- detail information (optional)
-      local cmp_item = entry:get_completion_item()  --- @type lsp.CompletionItem
-
-      if entry.source.name == 'nvim_lsp' then
-        -- Display which LSP servers this item came from.
-        local lspserver_name = nil
-        pcall(function()
-          lspserver_name = entry.source.source.client.name
-          vim_item.menu = lspserver_name
-        end)
-
-        -- Some language servers provide details, e.g. type information.
-        -- The details info hide the name of lsp server, but mostly we'll have one LSP
-        -- per filetype, and we use special highlights so it's OK to hide it..
-        local detail_txt = (function()
-          if not cmp_item.detail then return nil end
-
-          if cmp_item.detail == "Auto-import" then
-            local label = (cmp_item.labelDetails or {}).description
-            if not label or label == "" then return nil end
-            local logo = ({
-              pyright = ""
-            })[lspserver_name] or "󰋺"
-            return logo .. " " .. truncate(label, 20)
-          else
-            return truncate(cmp_item.detail, 50)
-          end
-        end)()
-        if detail_txt then
-          vim_item.menu = detail_txt
-          vim_item.menu_hl_group = 'CmpItemMenuDetail'
-        end
-
-      elseif entry.source.name == 'zsh' then
-        -- cmp-zsh: Display documentation for cmdline flag ('' denotes zsh)
-        ---@diagnostic disable-next-line: undefined-field
-        local detail = tostring(cmp_item.documentation)
-        if detail then
-          vim_item.menu = detail
-          vim_item.menu_hl_group = 'CmpItemMenuZsh'
-          vim_item.kind = '  ' .. 'zsh'
-        end
-
-      elseif entry.source.name == 'ultisnips' then
-        ---@diagnostic disable-next-line: undefined-field
-        local description = (cmp_item.snippet or {}).description
-        if description then
-          vim_item.menu = truncate(description, 40)
-        end
-      end
-
-      -- Add a little bit more padding
-      vim_item.menu = " " .. vim_item.menu
-      return vim_item
-    end
-  }
-  local sources = {
-    -- Note: make sure you have proper plugins specified in plugins.vim
-    -- https://github.com/topics/nvim-cmp
-    { name = 'nvim_lsp', priority = 100 },
-    { name = 'ultisnips', keyword_length = 2, priority = 50 },  -- workaround '.' trigger
-    { name = 'path', priority = 30 },
-    { name = 'omni', priority = 20 },
-    { name = 'buffer', priority = 10 },
-  }
-  local sorting = {
-    -- see $VIMPLUG/nvim-cmp/lua/cmp/config/compare.lua
-    comparators = {
-      cmp.config.compare.offset,
-      cmp.config.compare.exact,
-      cmp.config.compare.score,
-      function(...) return cmp_helper.compare.prioritize_argument(...) end,
-      function(...) return cmp_helper.compare.deprioritize_underscore(...) end,
-      cmp.config.compare.recently_used,
-      cmp.config.compare.kind,
-      cmp.config.compare.sort_text,
-      cmp.config.compare.length,
-      cmp.config.compare.order,
-    },
-  }
-
-  ---@diagnostic disable-next-line: missing-fields
-  cmp.setup {
-    snippet = snippet,
-    window = window,
-    mapping = mapping,
-    formatting = formatting,
-    sources = sources,
-    sorting = sorting,
-  }
-
-  -- filetype-specific sources
-  require("cmp_zsh").setup { filetypes = { "bash", "zsh" } }
-  ---@diagnostic disable-next-line: missing-fields
-  cmp.setup.filetype({'sh', 'zsh', 'bash'}, {
-    sources = cmp.config.sources({
-      { name = 'zsh', priorty = 100 },
-      { name = 'nvim_lsp', priority = 50 },
-      { name = 'ultisnips', keyword_length = 2, priority = 50 },  -- workaround '.' trigger
-      { name = 'path', priority = 30, },
-      { name = 'buffer', priority = 10 },
-    }),
-  })
-
-  -- Highlights
-  require('utils.rc_utils').RegisterHighlights(cmp_helper.apply_highlight)
-
-  do  -- set pumheight: limit popup menu height
-    function _reset_pumheight()
-      vim.o.pumheight = math.max(20, math.floor(vim.o.lines * 0.5))
-    end
-    vim.api.nvim_create_autocmd('VimResized', {
-      pattern = '*',
-      group = vim.api.nvim_create_augroup('lsp_cmp_on_resized_pumheight', { clear = true }),
-      callback = function() _reset_pumheight() end,
-    })
-    _reset_pumheight()
-  end
-end
-
--- Custom sorting/ranking for completion items.
-cmp_helper.compare = {
-  ---Deprioritize items starting with underscores (private or protected)
-  ---@type fun(lhs: cmp.Entry, rhs: cmp.Entry): boolean|nil
-  deprioritize_underscore = function(lhs, rhs)
-    local l = (lhs.completion_item.label:find "^_+") and 1 or 0
-    local r = (rhs.completion_item.label:find "^_+") and 1 or 0
-    if l ~= r then return l < r end
-  end,
-
-  ---Prioritize items that ends with "= ..." (usually for argument completion).
-  ---@type fun(lhs: cmp.Entry, rhs: cmp.Entry): boolean|nil
-  prioritize_argument = function(lhs, rhs)
-    local l = (lhs.completion_item.label:find "=$") and 1 or 0
-    local r = (rhs.completion_item.label:find "=$") and 1 or 0
-    if l ~= r then return l > r end
-  end,
-}
-
--- Highlights with bordered completion window (GH-224, GH-472)
-function cmp_helper.apply_highlight()
-  vim.cmd [[
-    " Dark background, and white-ish foreground
-    highlight! CmpPmenu         guibg=#242a30
-    highlight! CmpPmenuBorder   guibg=#242a30
-    highlight! CmpItemAbbr      guifg=#eeeeee
-    highlight! CmpItemMenuDefault   guifg=white
-    " gray
-    highlight! CmpItemAbbrDeprecated    guibg=NONE gui=strikethrough guifg=#808080
-    " fuzzy matching
-    highlight! CmpItemAbbrMatch         guibg=NONE guifg=#f03e3e gui=bold
-    highlight! CmpItemAbbrMatchFuzzy    guibg=NONE guifg=#fd7e14 gui=bold
-
-    " Item Kinds. defaults to CmpItemKind (#cc5de8)
-    " see $VIMPLUG/nvim-cmp/lua/cmp/types/lsp.lua
-    " {✅Class, ✅Module, ✅Interface, Struct, ✅Function, ✅Method, ✅Constructor,
-    "  ✅Variable, ✅Property, Field, ✅Unit, Value, Enum, EnumMember, Event,
-    "  ✅Keyword, Color, File, Reference, Folder, Constant, Operator, TypeParameter,
-    "  ✅Snippet, ✅Text}
-
-    " see SemshiGlobal
-    highlight!      CmpItemKindModule        guibg=NONE guifg=#FF7F50
-    highlight!      CmpItemKindClass         guibg=NONE guifg=#FFAF00
-    highlight! link CmpItemKindStruct        CmpItemKindClass
-    highlight!      CmpItemKindVariable      guibg=NONE guifg=#9CDCFE
-    highlight!      CmpItemKindProperty      guibg=NONE guifg=#9CDCFE
-    highlight!      CmpItemKindFunction      guibg=NONE guifg=#C586C0
-    highlight! link CmpItemKindConstructor   CmpItemKindFunction
-    highlight! link CmpItemKindMethod        CmpItemKindFunction
-    highlight!      CmpItemKindKeyword       guibg=NONE guifg=#FF5FFF
-    highlight!      CmpItemKindText          guibg=NONE guifg=#D4D4D4
-    highlight!      CmpItemKindUnit          guibg=NONE guifg=#D4D4D4
-    highlight!      CmpItemKindConstant      guibg=NONE guifg=#409F31
-    highlight!      CmpItemKindSnippet       guibg=NONE guifg=#E3E300
-  ]]
-end
-
------------------------------
--- Configs for PeekDefinition
------------------------------
+------------------------------
+--- Configs for PeekDefinition
+------------------------------
 _G.PeekDefinition = function(lsp_request_method)
   local params = vim.lsp.util.make_position_params()
   local definition_callback = function(_, result, ctx, config)
@@ -979,9 +764,9 @@ function M._define_peek_definition()
 end
 
 
-------------
--- LSPstatus
-------------
+-------------
+--- LSPstatus
+-------------
 function M.setup_lsp_status()
   local lsp_status = require('lsp-status')
   lsp_status.config({
@@ -1015,9 +800,6 @@ end
 function M._setup_lsp_commands()
   vim.cmd [[
     command! -nargs=0 LspDebug  :tab drop $HOME/.cache/nvim/lsp.log
-
-    command! -nargs=0 CodeActions   :lua vim.lsp.buf.code_action()
-    call CommandAlias("CA", "CodeActions")
   ]]
 end
 
@@ -1049,9 +831,9 @@ function M.setup_fidget()
   }
 end
 
----------------
--- trouble.nvim
----------------
+----------------
+--- trouble.nvim
+----------------
 function M.setup_trouble()
   require("trouble").setup {
     -- https://github.com/folke/trouble.nvim#setup
@@ -1061,7 +843,7 @@ function M.setup_trouble()
 end
 
 ----------------------------------------
--- Linting, and Code actions
+--- Linting, and Code actions
 ----------------------------------------
 function M.setup_null_ls()
   local null_ls = require("null-ls")
@@ -1144,7 +926,6 @@ end
 -- Entrypoint: setup all
 function M.setup_all()
   M.setup_lsp()
-  M.setup_cmp()
   M.setup_lsp_status()
   M.setup_navic()
   M.setup_fidget()
@@ -1154,9 +935,8 @@ end
 
 
 -- Resourcing support
-if RC and RC.should_resource() then
+if ... == nil then
   M.setup_all()
 end
 
-(RC or {}).lsp = M
 return M

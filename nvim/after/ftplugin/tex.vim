@@ -13,6 +13,7 @@ endif
 
 " tex-specific settings
 setlocal colorcolumn=100
+setlocal textwidth=99
 
 " Do not use conceal for LaTeX (e.g. indentLine)
 setlocal conceallevel=0
@@ -24,12 +25,15 @@ setlocal spell
 " ------------
 
 " wrap current word or selection with textbf/textit (need surround.vim)
-nmap <buffer> <leader>b ysiw}i\textbf<ESC>
-nmap <buffer> <leader>i ysiw}i\textit<ESC>
-nmap <buffer> <leader>u ysiw}i\underline<ESC>
+" \uline -> \usepackage{ulem}
+nmap <buffer> <leader>b <leader>bf
+nmap <buffer> <leader>bf ysiw}i\textbf<ESC>
+nmap <buffer> <leader>i <leader>it
+nmap <buffer> <leader>it ysiw}i\textit<ESC>
+nmap <buffer> <leader>u ysiw}i\uline<ESC>
 vmap <buffer> <leader>b S}i\textbf<ESC>
 vmap <buffer> <leader>i S}i\textit<ESC>
-vmap <buffer> <leader>u S}i\underline<ESC>
+vmap <buffer> <leader>u S}i\uline<ESC>
 
 " easy-align of align/tables {{
 " (with block)

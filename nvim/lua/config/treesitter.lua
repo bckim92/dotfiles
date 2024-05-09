@@ -4,8 +4,10 @@
 
 local M = {}
 
+local has = function(feature) return vim.fn.has(feature) > 0 end
+
 ---------------------------------------------------------------------------
--- Entrypoint.
+--- Entrypoint.
 ---------------------------------------------------------------------------
 
 function M.setup()
@@ -42,7 +44,7 @@ function M.setup()
 
     -- Deprecated as of neovim 0.10+ in favor of :InspectTree, only used for neovim <= 0.9
     playground = {
-      enable = true,
+      enable = not has('nvim-0.10'),
       updatetime = 30,
       keybindings = {
         toggle_query_editor = 'o',
@@ -72,7 +74,7 @@ end
 --- This works only if treesitter parser has been already installed *through* nvim-treesitter
 --- because the neovim core's built-in parser queries may not be compatible (see M.has_parser)
 --- @param lang string
---- @param bufnr? buffer|nil
+--- @param bufnr? integer
 function M.setup_highlight(lang, bufnr)
   vim.validate { lang = { lang, 'string' }, bufnr = { bufnr, 'number', true } }
 
@@ -80,16 +82,19 @@ function M.setup_highlight(lang, bufnr)
     bufnr = vim.api.nvim_get_current_buf()
   end
 
-  if M.has_parser(lang, bufnr) then  -- excludes built-in parser
+  if M.has_parser(lang) then  -- excludes built-in (bundled) parser
     local ok, _ = xpcall(function()
       vim.treesitter.start(bufnr, lang)
+      vim.treesitter.query.get(lang, 'highlights')
     end, function(err)
+      err = debug.traceback(err, 1)
       M.try_recover_parser_errors(lang, err)
     end)
     return ok and true or false
   else
     -- Maybe start later when parsers become available
-    vim.notify_once("Installing treesitter parser: " .. lang)
+    vim.notify_once("Treesitter parser does not exist for lang = " .. lang,
+      vim.log.levels.WARN, { title = "config.treesitter" })
     M._reattach_after_install._deferred[bufnr] = lang
     return false
   end
@@ -110,7 +115,7 @@ M._reattach_after_install = {
 }
 
 ---------------------------------------------------------------------------
--- Treesitter Parsers (automatic installation and repair)
+--- Treesitter Parsers (automatic installation and repair)
 ---------------------------------------------------------------------------
 
 -- Note: parsers are installed at $VIMPLUG/nvim-treesitter/parser/
@@ -171,7 +176,12 @@ local _recover_requested = false
 
 function M.try_recover_parser_errors(lang, err)
   -- This is a fatal, unrecoverable error where treesitter parsers must be re-installed.
-  if err and err:match('invalid node type') then
+  if err and (
+    -- see $NEOVIM/src/nvim/lua/treesitter.c query_err_to_string()
+    err:match('[Ii]nvalid node type') or
+    err:match('[Ii]nvalid field') or
+    err:match('[Ii]nvalid capture')
+  ) then
   else
     return false  -- Do not handle any other general errors (e.g. parser does not exist)
   end
@@ -183,7 +193,6 @@ function M.try_recover_parser_errors(lang, err)
   -- Treesitter is broken, disable all folding otherwise nvim might hang forever
   vim.opt_global.foldexpr = '0'
 
-  vim.api.nvim_echo({{ err, 'Error' }}, true, {})
   vim.cmd [[
     " workaround: disable TextChangedI autocmds that may cause treesitter errors
     silent! autocmd! cmp_nvim_ultisnips
@@ -192,16 +201,18 @@ function M.try_recover_parser_errors(lang, err)
 
   -- Try to recover automatically, if nvim-treesitter is still importable.
   local noti_opts = { print = true, timeout = 10000, title = 'config/treesitter', markdown = true }
-  vim.notify("Fatal error on treesitter parsers (see `:messages`). " ..
-             "Trying to reinstall treesitter parsers...",
-             vim.log.levels.WARN, noti_opts)
+  vim.notify(("Fatal error on treesitter parsers (see `:messages`), lang = `%s`. " ..
+              "Trying to reinstall treesitter parsers...\n\n"):format(lang) ..
+             err,
+             vim.log.levels.ERROR, noti_opts)
 
   -- Force-reinstall all treesitter parsers.
   vim.schedule(function()
     vim.defer_fn(function()
+      vim.api.nvim_echo({{ "Installing TS Parsers: " .. lang, "MoreMsg" }}, true, {})
       require('nvim-treesitter.install').commands.TSInstallSync["run!"](lang);
       require('nvim-treesitter.install').commands.TSUpdateSync.run();
-      vim.notify("Treesitter parsers have been re-installed. Please RESTART neovim.",
+      vim.notify(("Treesitter parser %s has been re-installed. Please RESTART neovim."):format(lang),
                  vim.log.levels.INFO, noti_opts)
     end, 1000)
   end)
@@ -220,8 +231,10 @@ end)
 
 
 --- Manually install by building parsers from a local, devel workspace.
---- Need to first build parser.c manually ($ npm run build && npm run test)
---- e.g. install_parsers_from_devel("luadoc", "~/workspace/dev/tree-sitter-luadoc")
+--- Need to first build parser.c manually if there are local changes:
+---   $ npm install && node-gyp configure && npm run build && npm run test)
+--- e.g.
+---   :lua require("config.treesitter").install_parsers_from_devel("luadoc", "~/workspace/dev/tree-sitter-luadoc")
 function M.install_parsers_from_devel(lang, dir)
   vim.validate { lang = { lang, 'string' }, dir = { dir, 'string' } }
   dir = vim.fn.expand(dir) --[[ @as string ]]
@@ -254,30 +267,42 @@ end
 
 
 ---------------------------------------------------------------------------
--- Custom treesitter queries
+--- Custom treesitter queries
 ---------------------------------------------------------------------------
---- https://github.com/nvim-treesitter/nvim-treesitter#adding-queries
---- "Dynamic" queries depending on project formatting style, etc. can be configured here.
---- For static query files, see $DOTVIM/after/queries.
----
---- Note that the first query file in the runtimepath (usually user config) will be used,
---- ignoring all other query files from plugins (nvim-treesitter) and VIMRUNTIME;
---- unless `; extend` is used (see :h treesitter-query-modeline).
---- If vim.treesitter.query.set() is used, all query files on runtimepath will be ignored.
+-- https://github.com/nvim-treesitter/nvim-treesitter#adding-queries
+-- "Dynamic" queries depending on project formatting style, etc. can be configured here.
+--
+-- For static query files, see:
+--    $DOTVIM/queries       => "overrides" query files.
+--    $DOTVIM/after/queries => "extends" nvim-treesitter's query files
+--      (should have the modeline ";; extends", otherwise will be ignored)
+--
+-- Note that ONLY the first query file in the &runtimepath will be used,
+-- ignoring all other query files from plugins (nvim-treesitter) and $VIMRUNTIME
+-- unless `;; extend` is used (see :h treesitter-query-modeline).
+--
+-- Usually runtimepath has an order of:
+--   user_config => plugins(nvim-treesitter) => $VIMRUNTIME => user_config/after => ...
+--
+-- If vim.treesitter.query.set() is used, ANY query files on runtimepath will be ignored.
 
 
 ---------------------------------------------------------------------------
--- Utilities
+--- Utilities
 ---------------------------------------------------------------------------
 
 function M.setup_keymap()
+  ---@type function(aliasname: string, target: string, { register_cmd?: boolean }
+  local cmd_alias = vim.fn.CommandAlias
+
+  -- see $VIMRUNTIME/lua/vim/_inspector.lua
+  vim.keymap.set('n', '<leader>tsh', '<cmd>Inspect<CR>')
+  vim.keymap.set('n', '<leader>i', '<cmd>Inspect<CR>')
+
   -- treesitter-playground is deprecated in favor of vim.treesitter.* APIs.
   if vim.fn.has('nvim-0.10') > 0 then
-    vim.fn.CommandAlias("TSPlaygroundToggle", "InspectTree", true)
-
-    -- see $VIMRUNTIME/lua/vim/_inspector.lua
-    vim.keymap.set('n', '<leader>tsh', '<cmd>Inspect<CR>')
-    vim.keymap.set('n', '<leader>i', '<cmd>Inspect<CR>')
+    cmd_alias("TSPlaygroundToggle", "InspectTree", { register_cmd = true })
+    cmd_alias("Tree", "InspectTree", { register_cmd = true })
 
   else  -- nvim < 0.10; fallback to treesitter-playground
     vim.cmd [[ command! InspectTree :TSPlaygroundToggle ]]

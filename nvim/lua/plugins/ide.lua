@@ -61,13 +61,30 @@ return {
       Plug 'tamago324/cmp-zsh';
       Plug 'petertriho/cmp-git';
     },
-    config = require('config.lsp').setup_cmp,
+    config = require('config.completion').setup_cmp,
   };
 
   -- Formatting
   Plug 'stevearc/conform.nvim' {
-    version = '>=4.0',
+    version = '>=5.0',
     config = require('config.formatting').setup,
+  };
+
+  -- DAP
+  Plug 'mfussenegger/nvim-dap' {
+    event = 'VeryLazy',
+    cmd = { 'DebugStart', 'DebugContinue' };
+    dependencies = {
+      Plug 'rcarriga/nvim-dap-ui' { version = '>=4.0' };
+      Plug 'rcarriga/cmp-dap';
+      Plug 'theHamsta/nvim-dap-virtual-text';
+      Plug 'Weissle/persistent-breakpoints.nvim';
+      Plug 'mfussenegger/nvim-dap-python';
+      Plug 'jbyuki/one-small-step-for-vimkind';
+    },
+    config = function()
+      require('config.dap').setup()
+    end,
   };
 
   -- Python
@@ -85,16 +102,16 @@ return {
   -- Other languages
   Plug 'editorconfig/editorconfig-vim';
   Plug 'sheerun/vim-polyglot' { version = 'v4.2.1' };
+  Plug 'vmchale/just-vim' { ft = 'just' };
   Plug 'tmux-plugins/vim-tmux' { ft = 'tmux' };
   Plug 'fladson/vim-kitty' { ft = 'kitty' };
-  Plug 'vim-pandoc/vim-pandoc' { ft = { 'pandoc', 'markdown' }, init = PlugConfig };
-  Plug 'vim-pandoc/vim-pandoc-syntax' { ft = { 'pandoc', 'markdown' } };
   Plug 'lervag/vimtex' { init = require('config.tex').init, config = require('config.tex').setup };
   Plug 'machakann/vim-Verdin' { ft = 'vim' };
   Plug 'gisraptor/vim-lilypond-integrator' { ft = 'lilypond' };
   Plug 'tfnico/vim-gradle' { ft = 'gradle' };
   Plug 'Tyilo/applescript.vim' { ft = 'applescript' };
   Plug 'rdolgushin/groovy.vim' { ft = 'groovy' };
+  Plug 'NoahTheDuke/vim-just' { ft = 'just' };
 
   -- Lua REPL
   Plug 'ii14/neorepl.nvim' { lazy = true };  -- :LuaREPL
@@ -104,8 +121,10 @@ return {
 
   -- Testing
   Plug 'nvim-neotest/neotest' {
+    version = '>=5.0',
     dependencies = {
       'nvim-lua/plenary.nvim',
+      'nvim-neotest/nvim-nio',
       'antoinemadec/FixCursorHold.nvim',
       Plug 'nvim-neotest/neotest-plenary';
       Plug 'nvim-neotest/neotest-python';

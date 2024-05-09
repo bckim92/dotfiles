@@ -48,14 +48,15 @@ require("lazy.manage").clean = function(opts)
   return require("lazy.manage").run({ pipeline = {} })
 end
 require("lazy.manage.task.fs").clean.run = function(self)
+  ---@diagnostic disable-next-line: undefined-field
   local plugin_name = (self.plugin or {}).name or '(unknown)'
   print("[lazy.nvim] Clean operation is disabled. (lazy.manage.task.fs) plugin = " .. plugin_name .. '\n')
   local inform_user = function()
-    vim.notify(("[lazy.nvim] Please check and remove %s/%s.cloning manually.\n"):format(vim.env.VIMPLUG, plugin_name),
-        vim.log.levels.ERROR, { title = 'config/plugins.lua', timeout = 10000 })
+    local msg = ("[lazy.nvim] Please check and remove `%s/%s.cloning` manually.\n"):format(vim.env.VIMPLUG, plugin_name)
+    vim.notify(msg, vim.log.levels.ERROR, { title = 'config/plugins.lua', timeout = 10000, markdown = true })
   end
   vim.api.nvim_create_autocmd('VimEnter', { pattern = '*', callback = inform_user })
-  inform_user()
+  inform_user()  -- for headless execution
 end
 
 -- Monkey-patch: Normalize git origin, avoid unnecessary re-cloning on update
@@ -66,6 +67,10 @@ require("lazy.manage.git").get_origin = function(repo)
   origin = string.gsub(origin, 'https://git::@github.com/', 'https://github.com/')
   return origin
 end
+
+-- workaround for neovim/neovim#27413
+-- vim.fs must be loaded before vim.loader.enable()
+require("vim.fs")
 
 -- Setup and load plugins. All plugins will be source HERE!
 -- https://github.com/folke/lazy.nvim#%EF%B8%8F-configuration
@@ -227,10 +232,17 @@ pcall(function()
   vim.fn.CommandAlias('LazyProfile', 'Lazy profile', register_cmd)
 end)
 
--- list_plugs: Get all the registered plugins (including non-loaded ones)
+--- list_plugs: Get all the registered plugins (including non-loaded ones)
 ---@return string[]
 function M.list_plugs()
   return vim.tbl_keys(require("lazy.core.config").plugins)
+end
+
+--- Get a LazyPlugin table by its name (exact).
+---@param name string
+---@return LazyPlugin|nil
+function M.get_plugin(name)
+  return require("lazy.core.config").plugins[name]
 end
 
 -- load: immediately load (lazy) plugins synchronously
@@ -239,4 +251,5 @@ function M.load(names)
   require("lazy.core.loader").load(names, {}, { force = true })
 end
 
+_G.lazy = require("lazy");
 return M

@@ -24,7 +24,7 @@ return {
       if vim.fn.isdirectory(vim.fn.expand("$HOME/.fzf")) == 0 then
         local msg = "~/.fzf not found. Please run `dotfiles update`"
         vim.defer_fn(function()
-          vim.notify(msg, vim.log.levels.WARN, { title = "plugins.ui" })
+          vim.notify(msg, vim.log.levels.WARN, { title = "plugins.ui", markdown = true })
         end, 100) -- nvim-notify might be not ready yet
         return false
       end
@@ -41,12 +41,10 @@ return {
 
   -- Telescope (config/telescope.lua)
   Plug 'nvim-telescope/telescope.nvim' {
-    branch = vim.fn.has('nvim-0.9.0') > 0 and 'master' or '0.1.x', -- nvim 0.8.0 compat
-    name = vim.fn.has('nvim-0.9.0') > 0 and 'telescope.nvim' or 'telescope.nvim.legacy',
+    enabled = vim.fn.has('nvim-0.9.0') > 0,
     event = 'CmdlineEnter',
     config = function()
-      -- as a script, not as a module yet
-      require 'config/telescope'
+      require('config.telescope').setup()
     end,
   };
 
@@ -92,7 +90,4 @@ return {
     end
   };
   Plug 'vim-scripts/errormarker.vim' { event = 'VeryLazy' };
-
-  -- Etc
-  Plug 'NvChad/nvim-colorizer.lua' { lazy = true };
 }

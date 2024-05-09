@@ -1,5 +1,6 @@
 " Indent adopted from python-mode's indent/python.vim
 " (Legacy vimscript support, we will move to treesitter indent soon)
+" vim: set ts=4 sts=4 sw=4:
 
 setlocal autoindent
 setlocal indentexpr=PEP8PythonIndent(v:lnum)
@@ -24,6 +25,12 @@ function! PEP8PythonIndent(lnum)
     " First line has indent 0
     if a:lnum == 1
         return 0
+    endif
+
+    " If the current line is inside a string, ignore and keep the current one
+    let captures = get(b:, 'ts_highlight') ? luaeval('vim.treesitter.get_captures_at_pos(0, _A, 0)', a:lnum - 1) : []
+    if ! captures->filter('v:val.capture == "string")')->empty()
+        return -1  " inside a string node
     endif
 
     " If we can find an open parenthesis/bracket/brace, line up with it.
@@ -116,29 +123,39 @@ function! PEP8PythonIndent(lnum)
 endfunction
 
 
+function! s:should_skip_search_treesitter() abort
+    let captures = get(b:, 'ts_highlight') ? luaeval('vim.treesitter.get_captures_at_cursor(0)') : []
+    return captures->index("comment") >= 0 || captures->index("string") >= 0
+endfunction
+
+
 " Find backwards the closest open parenthesis/bracket/brace.
-function! s:SearchParensPair() " {{{
+function! s:SearchParensPair() abort " {{{
     let line = line('.')
     let col = col('.')
 
     " Skip strings and comments and don't look too far
-    let skip = "line('.') < " . (line - 50) . " ? dummy :" .
-                \ 'synIDattr(synID(line("."), col("."), 0), "name") =~? ' .
-                \ '"string\\|comment\\|doctest"'
+    if get(b:, 'ts_highlight', 0)
+        let Skip = { -> s:should_skip_search_treesitter() }
+    else
+        let Skip = "line('.') < " . (line - 50) . " ? dummy :" .
+                    \ 'synIDattr(synID(line("."), col("."), 0), "name") =~? ' .
+                    \ '"string\\|comment\\|doctest"'
+    endif
 
     " Search for parentheses
     call cursor(line, col)
-    let parlnum = searchpair('(', '', ')', 'bW', skip)
+    let parlnum = searchpair('(', '', ')', 'bW', Skip)
     let parcol = col('.')
 
     " Search for brackets
     call cursor(line, col)
-    let par2lnum = searchpair('\[', '', '\]', 'bW', skip)
+    let par2lnum = searchpair('\[', '', '\]', 'bW', Skip)
     let par2col = col('.')
 
     " Search for braces
     call cursor(line, col)
-    let par3lnum = searchpair('{', '', '}', 'bW', skip)
+    let par3lnum = searchpair('{', '', '}', 'bW', Skip)
     let par3col = col('.')
 
     " Get the closest match

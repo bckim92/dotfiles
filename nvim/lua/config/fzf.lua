@@ -28,8 +28,8 @@ end
 
 function M.setup_fzf()
   local defaults = require('fzf-lua.defaults').defaults
-  local FZF_VERSION = require("fzf-lua.utils").fzf_version({}) or 0.0  ---@type float
-  local GIT_VERSION = require("fzf-lua.utils").git_version() or 0.0  ---@type float
+  local FZF_VERSION = require("fzf-lua.utils").fzf_version() or 0.0  ---@type number (float)
+  local GIT_VERSION = require("fzf-lua.utils").git_version() or 0.0  ---@type number (float)
 
   -- fzf-lua.setup(opts)
   local global_opts = {
@@ -122,6 +122,24 @@ function M.setup_fzf()
       },
     }
   end
+
+  global_opts.lsp = {
+    code_actions = {
+      previewer = "codeaction_native",
+      preview_pager = (
+        "delta --side-by-side --width=$FZF_PREVIEW_COLUMNS " ..
+        "--hunk-header-style='omit' --file-style='omit' "
+      ),
+      async_or_timeout = 1000,
+      winopts = {
+        preview = {
+          layout = "vertical",
+          height = 0.8,
+          vertical = "up:75%",
+        },
+      }
+    }
+  }
 
   -- insert-mode completion: turn on preview by default
   global_opts.complete_file = {
@@ -256,10 +274,14 @@ function M.setup_fzf()
   -- neovim providers
   -- (some commands are provided by telescope because it's often better with telescope)
   --    :Commands, :Maps, :Highlights
+  command("Tabs", {}, "FzfLua tabs")
   command("Buffers", { nargs = "?", complete = "buffer" }, bind_query(fzf.buffers)):alias("B")
   vim.keymap.set('n', '<leader>B', '<Cmd>Buffers<CR>')
-  command("Colors", { nargs = "?", complete = "color" }, bind_query(fzf.colorschemes))
+  command("Colors", { nargs = "?", complete = "color" }, bind_query(fzf.colorschemes)):alias("Co")
+  command("Highlights", { nargs = "?", complete = "highlight" }, bind_query(fzf.highlights)):alias("Hi")
   command("Help", { nargs = "?", complete = "help" }, bind_query(fzf.help_tags)):alias("He")
+  vim.keymap.set('n', '<F1>', function() fzf.help_tags { query = vim.fn.expand('<cword>') } end)
+  vim.keymap.set('v', '<F1>', function() vim.cmd.norm [["hy]]; fzf.help_tags { query = vim.fn.getreg('h') } end)
   command("Lines", { nargs = "?" }, bind_query(fzf.lines))
   command("BLines", { nargs = "?" }, bind_query(fzf.blines))
   command("BTags", { nargs= "?" }, bind_query(fzf.btags)):nmap("<leader>FT")
@@ -267,7 +289,15 @@ function M.setup_fzf()
   command("Jumps", {}, "FzfLua jumps")
   command("Filetypes", {}, "FzfLua filetypes")
   command("CommandHistory", {}, "FzfLua command_history"):alias("CH")
-  command("SearchHistory", {}, "FzfLua search_history"):alias("CH")
+  command("SearchHistory", {}, "FzfLua search_history"):alias("SH")
+
+  command("RuntimePath", { nargs = 0 }, function()
+    local rtp = vim.opt.runtimepath:get()
+    require("fzf-lua").fzf_exec(vim.tbl_map(M.utils.highlight_path_ansi, rtp), {
+      prompt = "&runtimepath ❯ ",
+      fzf_opts = { ["--ansi"] = "", ["--no-sort"] = "", },
+    })
+  end):alias("RTP")
 
   -- [[ Insert-mode Keymaps ]]
   -- similar to i_CTRL-X (:help ins-completion)
@@ -348,7 +378,7 @@ function M.setup_fzf()
           vim.opt_local.winhighlight:append("Normal:FzfLuaPmenu")
           -- Put the fzf-lua widget below near the command line, similar to wildmenu
           local height = vim.api.nvim_win_get_config(winid).height
-          vim.api.nvim_win_set_config(winid, { row = math.max(1, vim.o.lines - height), col = 0, relative = 'editor' })
+          vim.api.nvim_win_set_config(winid, { row = math.max(1, vim.o.lines - height - 1), col = 0, relative = 'editor' })
         end,
       },
     })
@@ -527,15 +557,36 @@ function M.setup_custom()
 end
 
 
+--[[ Miscellaneous utilities ]]
+M.utils = {}
+
+function M.utils.highlight_path_ansi(path, opts)
+  opts = vim.tbl_deep_extend('keep', opts or {}, {
+    last_segment = true,
+  })
+
+  local last_second_slash = path:match("^.*/().+/")
+  if last_second_slash and opts.last_segment then
+    local before_last_segment = path:sub(1, last_second_slash - 1)
+    local last_segment = path:sub(last_second_slash)
+
+    local YELLOW = string.char(27) .. '[0;' .. tostring(33) .. 'm'
+    local RESET  = string.char(27) .. '[0m'
+    return before_last_segment .. YELLOW .. last_segment .. RESET
+  end
+
+  return path
+end
+
+
 function M.setup()
   M.setup_fzf()
   M.setup_custom()
 end
 
 -- Resourcing support
-if RC and RC.should_resource() then
+if ... == nil then
   M.setup()
 end
 
-(RC or {}).fzf = M
 return M
