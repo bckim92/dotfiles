@@ -668,8 +668,10 @@ command! -nargs=1 MakeprgGlobal let &g:makeprg="<args>" | echo "&g:makeprg = <ar
 command! -nargs=1 MakeprgLocal  let &l:makeprg="<args>" | echo "&l:makeprg = <args>"
 
 " :Just, :just
-command! -nargs=* -bar Just   AsyncRun just <q-args>
-autocmd CmdlineEnter * ++once call CommandAlias('just', 'Just')
+if has('nvim')
+  command! -nargs=* -bar Just   AsyncRun just <q-args>
+  autocmd CmdlineEnter * ++once call CommandAlias('just', 'Just')
+endif
 
 " }}}
 
@@ -1204,7 +1206,9 @@ EOF
     return completions
   endfunction
 endfunction
-autocmd CmdlineEnter * ++once call s:setup_pyedit_commands()
+if has('nvim')
+  autocmd CmdlineEnter * ++once call s:setup_pyedit_commands()
+endif
 
 
 " }}}
@@ -1252,7 +1256,7 @@ endif
 function! RegisterHighlights(funcname) abort
   call funcref(a:funcname)()
   augroup Colorscheme_RegisterHighlights
-    exec "autocmd Colorscheme *  call " .. a:funcname .. "()"
+    exec "autocmd Colorscheme *  call " . a:funcname . "()"
   augroup END
 endfunction
 augroup Colorscheme_RegisterHighlights | autocmd! | augroup END
@@ -2448,13 +2452,15 @@ function! s:GCommit(mods, args) abort
 endfunction
 
 " Remove or replace some fugitive commands
-augroup FugitiveCustomizeCommands
-  autocmd CmdlineEnter * ++once silent! delcommand GDelete
+if has('nvim') || has('patch-8.1.1113')
+  augroup FugitiveCustomizeCommands
+    autocmd CmdlineEnter * ++once silent! delcommand GDelete
 
- " :G         => :GDiff
- " :G <args>  => :Git <args>
-  autocmd CmdlineEnter * ++once command! -nargs=?  -complete=customlist,fugitive#Complete  G    call s:G(<q-args>)
-augroup END
+    " :G         => :GDiff
+    " :G <args>  => :Git <args>
+    autocmd CmdlineEnter * ++once command! -nargs=?  -complete=customlist,fugitive#Complete  G    call s:G(<q-args>)
+  augroup END
+endif
 
 function! s:G(arg) abort
   if empty(Trim(a:arg))
@@ -2529,44 +2535,6 @@ function! s:init_airline_fugitive() abort
   catch /E117/  " airline doesn't exist yet
   endtry
 endfunction
-
-" ---------------------------------------------------------------- }}}
-" gitsigns.nvim {{{
-" :Gitsigns
-
-" see ~/.config/nvim/lua/config/git.lua
-
-" ---------------------------------------------------------------- }}}
-" diffview.nvim {{{
-" Assumed fugitive is always available.
-
-" see ~/.config/nvim/lua/config/git.lua
-
-" ---------------------------------------------------------------- }}}
-" git-messenger {{{
-
-" map <C-O>/<C-I> to jumping to older and Older(recent) commits,
-" respectively (see rhysd/git-messenger.vim#3)
-augroup git_messenger_autocmd
-  autocmd!
-  autocmd FileType gitmessengerpopup nmap <buffer> <C-O> o
-  autocmd FileType gitmessengerpopup nmap <buffer> <C-I> O
-augroup END
-
-" Display content diff as well in the popup window
-let g:git_messenger_include_diff = 'current'
-
-" Use git blame -w (ignore-whitespaces).
-let g:git_messenger_extra_blame_args = '-w'
-
-" Use border for the popup window.
-if has('nvim-0.5.0')
-lua << EOF
-  vim.g.git_messenger_floating_win_opts = {
-    border = 'single',
-  }
-EOF
-endif
 
 " ---------------------------------------------------------------- }}}
 " gundo key mappings and options {{{

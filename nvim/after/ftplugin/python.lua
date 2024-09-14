@@ -1,6 +1,20 @@
 -- python.lua: python ftplugin
 -- (see also python.vim)
 
+-- Basic buffer options (indent size, etc.)
+-- Note: FileType triggered again after editorconfig might override options, so set it again
+local indent_size = tonumber((vim.b.editorconfig or {}).indent_size) or 4
+vim.opt_local.expandtab = true
+vim.opt_local.ts = indent_size
+vim.opt_local.sw = indent_size
+vim.opt_local.sts = indent_size
+
+vim.g.python_recommended_style = 0  -- Prevent $VIMRUNTIME/ftplugin/python.vim from overridding tabsize
+
+-- line-length: 79 by default, TODO read from pyproject.toml
+vim.opt_local.textwidth = 79
+vim.opt_local.colorcolumn = '+1'
+
 -- Use treesitter highlight for python
 -- Note: nvim >= 0.9 recommended, injection doesn't work well in 0.8.x
 require("config.treesitter").setup_highlight('python')
@@ -87,6 +101,11 @@ local function make_repeatable_toggle_comment_keymap(comment)
 end
 bufmap('n', '<leader>ti', make_repeatable_toggle_comment_keymap("type: ignore"), { remap = true })
 bufmap('n', '<leader>ty', make_repeatable_toggle_comment_keymap("yapf: ignore"), { remap = true })
+
+-- Insert pylint directives (via ultisnips)
+local ultisnips_expand = '<C-R>=UltiSnips#ExpandSnippet()<CR>'
+bufmap('n', '<leader>tl', 'A  pylint' .. ultisnips_expand)
+bufmap('n', '<leader>tL', 'Opylint' .. ultisnips_expand)
 
 -- Toggle Optional[...], Annotated[...] for typing
 bufmap('n', '<leader>O', '<leader>tO', { remap = true })

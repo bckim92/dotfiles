@@ -17,6 +17,7 @@ return {
   Plug 'lewis6991/gitsigns.nvim' {
     event = 'VeryLazy',
     config = require('config.git').setup_gitsigns,
+    commit = '39b5b6f', -- v0.10.0-dev, not compatible with v0.9.0
   };
 
   Plug 'sindrets/diffview.nvim' {
@@ -24,5 +25,8 @@ return {
     config = require('config.git').setup_diffview,
   };
 
-  Plug 'rhysd/git-messenger.vim' { keys = '<leader>gm' };
+  Plug 'rhysd/git-messenger.vim' {
+    keys = '<leader>gm',
+    config = require('config.git').setup_gitmessenger,
+  };
 }

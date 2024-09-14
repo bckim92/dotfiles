@@ -168,7 +168,7 @@ hi link @lsp.type.operator              @operator
 hi link @lsp.type.string                @string
 hi link @lsp.type.namespace             @module
 hi link @lsp.type.parameter             @variable.parameter
-hi link @lsp.type.decorator             @function
+hi link @lsp.type.decorator             @type.qualifier
 hi link @lsp.type.comment               @comment
 hi link @lsp.type.lifetime              @keyword.storageclass
 
@@ -299,3 +299,4 @@ hi! @lsp.type.namespace.python  guifg=NONE
 " Gitcommit
 hi!      @string.special.url.gitcommit    guifg=#df6383 gui=NONE
 hi! link @markup.heading.gitcommit        PreProc
+hi!      @comment.warning.gitcommit       guibg=NONE gui=undercurl guisp=#ffa94d

@@ -39,7 +39,7 @@ return {
   Plug 'folke/neodev.nvim' { event = LspSetup };
   Plug 'ray-x/lsp_signature.nvim' { event = LspSetup };
   Plug 'WhoIsSethDaniel/toggle-lsp-diagnostics.nvim' { lazy = true };
-  Plug 'jose-elias-alvarez/null-ls.nvim' { event = LspSetup, config = require('config.lsp').setup_null_ls };
+  Plug 'nvimtools/none-ls.nvim' { event = LspSetup, config = require('config.lsp').setup_null_ls };
   Plug 'nvim-lua/lsp-status.nvim' { event = LspSetup, config = require('config.lsp').setup_lsp_status };
   Plug 'j-hui/fidget.nvim' { branch = 'legacy', event = LspSetup, config = require('config.lsp').setup_fidget };
   Plug 'folke/trouble.nvim' { event = LspSetup, config = require('config.lsp').setup_trouble };
@@ -50,7 +50,7 @@ return {
 
   -- Completion
   Plug 'hrsh7th/nvim-cmp' {
-    commit = '51260c0',  -- 2023-10-25
+    commit = '5260e5e',  -- 2024-05-17
     event = 'InsertEnter',  -- or required by config/lsp.lua
     dependencies = {
       Plug 'hrsh7th/cmp-buffer';
@@ -100,7 +100,7 @@ return {
   Plug 'wookayin/vim-autoimport' { cond = has_py3, ft = 'python' };
 
   -- Other languages
-  Plug 'editorconfig/editorconfig-vim';
+  Plug 'editorconfig/editorconfig-vim' { cond = not has('nvim') };
   Plug 'sheerun/vim-polyglot' { version = 'v4.2.1' };
   Plug 'vmchale/just-vim' { ft = 'just' };
   Plug 'tmux-plugins/vim-tmux' { ft = 'tmux' };

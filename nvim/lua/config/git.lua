@@ -30,7 +30,6 @@ function M.setup_fugitive()
   vim.api.nvim_create_user_command("GDiffTerm", function(e)
     local args = vim.fn.expandcmd(vim.trim(e.args))  -- supports '%'
     local cmd = "git diff --color " .. args
-    if vim.fn.executable('delta') > 0 then cmd = cmd .. ' | delta ' end
     -- Disable -F (exit on EOF) because we will autoclose the floaterm
     vim.fn['floaterm#new'](0, cmd .. " | less -+F", vim.empty_dict(), {
       name = 'git', autoclose = 1,
@@ -51,6 +50,32 @@ function M.setup_fugitive()
   M._setup_git_commands()
 end
 
+function M.setup_gitmessenger()
+  --- https://github.com/rhysd/git-messenger.vim#variables
+
+  -- Use git blame -w (ignore-whitespaces).
+  vim.g.git_messenger_extra_blame_args = '-w'
+
+  -- Display content diff as well in the popup window
+  vim.g.git_messenger_include_diff = 'current'
+
+  -- Use border for the popup window.
+  vim.g.git_messenger_floating_win_opts = {
+    border = 'single',
+  }
+
+  -- map <C-O>/<C-I> to jumping to older and Older(recent) commits, respectively
+  -- (see rhysd/git-messenger.vim#3)
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = 'gitmessengerpopup',
+    group = vim.api.nvim_create_augroup('git_messenger_autocmd', { clear = true }),
+    callback = function()
+      vim.keymap.set('n', '<C-O>', 'o', { remap = true, buffer = true })
+      vim.keymap.set('n', '<C-I>', 'O', { remap = true, buffer = true })
+    end
+  })
+end
+
 function M.setup_gitsigns()
   -- :help gitsigns-usage
   -- :help gitsigns-config
@@ -61,20 +86,19 @@ function M.setup_gitsigns()
     signs = {
       -- █ ▉ ▊ ▋ ▌ ▍ ▎ ▏ ┃│┆
       -- For highlights, see $DOTVIM/colors/xoria256-wook.vim
-      add          = { hl = 'GitSignsAdd'   ,    text = '┃', numhl = 'GitSignsAddNr'   , linehl = 'GitSignsAddLn' },
-      change       = { hl = 'GitSignsChange',    text = '┃', numhl = 'GitSignsChangeNr', linehl = 'GitSignsChangeLn' },
-      topdelete    = { hl = 'GitSignsDelete',    text = '‾', numhl = 'GitSignsDeleteNr', linehl = 'GitSignsDeleteLn' },
-      delete       = { hl = 'GitSignsDelete',    text = '_', numhl = 'GitSignsDeleteNr', linehl = 'GitSignsDeleteLn' },
-      changedelete = { hl = 'GitSignsChange',    text = '┃', numhl = 'GitSignsChangeNr', linehl = 'GitSignsChangeLn' },
-      untracked    = { hl = 'GitSignsUntracked', text = '┆', numhl = 'GitSignsUntracked', linehl = 'GitSignsUntrackedLn' },
+      add          = { text = '┃' },
+      change       = { text = '┃' },
+      topdelete    = { text = '‾' },
+      delete       = { text = '_' },
+      changedelete = { text = '┃' },
+      untracked    = { text = '┆' },
     },
-    _signs_staged_enable = true, -- experimental
-    _signs_staged = {
-      add          = { hl = 'GitSignsStagedAdd'   , text = '█', numhl = 'GitSignsStagedAddNr'   , linehl = 'GitSignsStagedAddLn' },
-      change       = { hl = 'GitSignsStagedChange', text = '█', numhl = 'GitSignsStagedChangeNr', linehl = 'GitSignsStagedChangeLn' },
-      topdelete    = { hl = 'GitSignsStagedDelete', text = '🮂', numhl = 'GitSignsStagedDeleteNr', linehl = 'GitSignsStagedDeleteLn' },
-      delete       = { hl = 'GitSignsStagedDelete', text = '🬭', numhl = 'GitSignsStagedDeleteNr', linehl = 'GitSignsStagedDeleteLn' },
-      changedelete = { hl = 'GitSignsStagedChange', text = '█', numhl = 'GitSignsStagedChangeNr', linehl = 'GitSignsStagedChangeLn' },
+    signs_staged = {
+      add          = { text = '█' },
+      change       = { text = '█' },
+      topdelete    = { text = '🮂' },
+      delete       = { text = '🬭' },
+      changedelete = { text = '█' },
     },
     sign_priority = 6,  -- Note: LSP diagnostics sign priority is 10~13
     -- numhl = true,

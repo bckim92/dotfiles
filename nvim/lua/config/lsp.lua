@@ -58,13 +58,13 @@ local on_attach = function(client, bufnr)
 
   -- See `:help vim.lsp.*` for documentation on any of the below functions
   if pcall(require, 'fzf-lua') then
-    nbufmap('gr', vim_cmd 'lua require("fzf-lua").lsp_references { jump_to_single_result = true, silent = true}')
+    nbufmap('gr', vim_cmd 'lua require("fzf-lua").lsp_references { jump_to_single_result = true, silent = true }', { nowait = true })
     nbufmap('gd', vim_cmd 'lua require("fzf-lua").lsp_definitions { jump_to_single_result = true, silent = true }')
     nbufmap('gi', vim_cmd 'lua require("fzf-lua").lsp_implementations { jump_to_single_result = true, silent = true }')
     nbufmap('gt', gt_action('lua require("fzf-lua").lsp_typedefs { jump_to_single_result = true, silent = true }'))
   else
     nbufmap('gd', vim_cmd 'lua vim.lsp.buf.definition()')
-    nbufmap('gr', vim_cmd 'lua vim.lsp.buf.references()')
+    nbufmap('gr', vim_cmd 'lua vim.lsp.buf.references()', { nowait = true })
     nbufmap('gi', vim_cmd 'lua vim.lsp.buf.implementation()')
     nbufmap('gt', gt_action('lua vim.lsp.buf.type_definition()'))
   end
@@ -290,6 +290,8 @@ local pyright_opts = function(setup_name)
       [setup_name] = {
         analysis = {
           typeCheckingMode = "basic",
+          -- see https://github.com/microsoft/pyright/blob/main/docs/import-resolution.md#resolution-order
+          extraPaths = { "./python" },
         },
         -- Always use the current python in accordance with $PATH (the current conda/virtualenv).
         pythonPath = vim.fn.exepath("python3"),
@@ -319,20 +321,25 @@ lsp_setup_opts['ruff_lsp'] = function()
   local init_options = {
     -- https://github.com/astral-sh/ruff-lsp#settings
     -- https://github.com/astral-sh/ruff-lsp/blob/main/ruff_lsp/server.py
+    -- Note: use pyproject.toml to configure ruff per project.
     settings = {
       fixAll = true,
       organizeImports = false,  -- let isort take care of organizeImports
       -- extra CLI arguments
-      -- https://beta.ruff.rs/docs/configuration/#command-line-interface
-      -- https://beta.ruff.rs/docs/rules/
-      args = { "--ignore", table.concat({
-        "E111", -- indentation-with-invalid-multiple
-        "E114", -- indentation-with-invalid-multiple-comment
-        "E402", -- module-import-not-at-top-of-file
-        "E501", -- line-too-long
-        "E702", -- multiple-statements-on-one-line-semicolon
-        "E731", -- lambda-assignment
-      }, ',') },
+      -- https://docs.astral.sh/ruff/configuration/#command-line-interface
+      -- https://docs.astral.sh/ruff/rules/
+      args = {
+        "--preview", -- Use experimental features
+        "--ignore", table.concat({
+          "E111", -- indentation-with-invalid-multiple
+          "E114", -- indentation-with-invalid-multiple-comment
+          "E402", -- module-import-not-at-top-of-file
+          "E501", -- line-too-long
+          "E702", -- multiple-statements-on-one-line-semicolon
+          "E731", -- lambda-assignment
+          "F401", -- unused-import  (note: should be handled by pyright as 'hint')
+        }, ','),
+      },
     },
   };
   return { init_options = init_options }
@@ -413,6 +420,15 @@ lsp_setup_opts['clangd'] = {
 
 lsp_setup_opts['bashls'] = {
   filetypes = { 'sh', 'zsh' },
+}
+
+lsp_setup_opts['ltex'] = {
+  filetypes = { 'markdown', 'tex', 'gitcommit' },
+  settings = {
+    -- https://valentjn.github.io/ltex/settings.html
+    ltex = {
+    },
+  },
 }
 
 lsp_setup_opts['yamlls'] = {
@@ -877,7 +893,7 @@ function M.setup_null_ls()
           condition = function(utils)  ---@param utils ConditionalUtils
             -- https://pylint.pycqa.org/en/latest/user_guide/run.html#command-line-options
             return executable('pylint') and
-              utils.root_has_file({ "pylintrc", ".pylintrc", "setup.cfg", "pyproject.toml" })
+              utils.root_has_file({ "pylintrc", ".pylintrc" })
           end,
       },
     })
