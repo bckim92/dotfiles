@@ -63,6 +63,7 @@ return {
     },
     config = require('config.completion').setup_cmp,
   };
+  Plug 'github/copilot.vim';
 
   -- Formatting
   Plug 'stevearc/conform.nvim' {
