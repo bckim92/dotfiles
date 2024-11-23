@@ -9,6 +9,7 @@ return {
   Plug 'junegunn/vim-peekaboo' { event = 'VeryLazy' };
   Plug 'folke/which-key.nvim' {
     event = 'VeryLazy',
+    version = 'v2.1.0',  -- v3 is not compatible with lazy.nvim < v11
     opts = {
       window = { border = "single", winblend = 10 },
       layout = { height = { min = 4, max = 8 } },

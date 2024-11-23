@@ -125,7 +125,9 @@ snippet "(#\s*)?pylint"  "'pylint: disable=...' marker" r
 # pylint: disable=${1:`!p snip.rv = collect_lsp_lint_codes("pylint")`}
 endsnippet
 priority 0
-
+snippet "(#\s*)?fmt"  "fmt: skip marker for the line (line comment)" r
+# fmt: skip
+endsnippet
 snippet "#\s*type"  "'type: ignore' marker (mypy, pyright)" r
 # type: ignore
 endsnippet
@@ -147,24 +149,24 @@ endsnippet
 snippet b "breakpoint()"
 breakpoint()
 endsnippet
-snippet embed
-from IPython import embed; embed(colors="neutral")  # XXX DEBUG  # yapf: disable
+snippet embed "IPython.embed()"
+__import__('IPython').embed(colors='neutral')  # XXX DEBUG
 endsnippet
 snippet embedsys
 from IPython import embed; embed(colors="neutral")  # XXX DEBUG  # yapf: disable
 import sys; sys.exit()
 endsnippet
-snippet pt "ptipython's embed"
-import ptpython.ipython; ptpython.ipython.embed(configure=ptpython.repl.run_config)  # XXX DEBUG  # yapf: disable
+snippet pt "ptpython.ipython.embed()"
+exec('import ptpython.ipython; ptpython.ipython.embed(configure=ptpython.repl.run_config)')  # XXX DEBUG  # fmt: skip
 endsnippet
-snippet pdb
-import pdb; pdb.set_trace()  # XXX DEBUG  # yapf: disable
+snippet pdb "pdb.set_trace"
+__import__('pdb').set_trace()  # XXX DEBUG
 endsnippet
-snippet ipdb
-import ipdb; ipdb.set_trace(cond=True)  # XXX DEBUG  # yapf: disable
+snippet ipdb "ipdb.set_trace"
+__import__('ipdb').set_trace(cond=True)  # XXX DEBUG
 endsnippet
-snippet pudb
-import pudb; pudb.set_trace(paused=True)  # XXX DEBUG  # yapf: disable
+snippet pudb "pudb.set_trace"
+__import__('pudb').set_trace(cond=True)  # XXX DEBUG
 endsnippet
 snippet nest_asyncio "nest_asyncio.apply"
 import nest_asyncio; nest_asyncio.apply()  # yapf: disable

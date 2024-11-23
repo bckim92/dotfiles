@@ -53,7 +53,7 @@ main() {
   # [right status] Memory Usage
   tmux set -ga status-right "#($cwd/statusbar.tmux component-ram -S $session_name)"
   # [right status] GPU Usage
-  if command -v gpustat &> /dev/null && command -v nvidia-smi &> /dev/null; then
+  if command -v gpustat &> /dev/null && (lsmod | grep -q nvidia); then
     tmux set -ga status-right "#($cwd/statusbar.tmux component-gpu -S $session_name)"
   fi
 
@@ -138,7 +138,8 @@ component-ram() {
   case $(uname -s) in
     Linux)
       if ! command -v free 2>&1 > /dev/null; then return 1; fi
-      IFS=" " read -r mem_used mem_total mem_percentage <<<"$(free -m | awk '/^Mem/ { print ($3/1024), ($2/1024), ($3/$2*100) }')"
+      # mem_used includes shared memory usage: `free` reports total($2), used($3), free, shared($5), buff/cache, available.
+      IFS=" " read -r mem_used mem_total mem_percentage <<<"$(free -m | awk '/^Mem/ { print (($3+$5)/1024), ($2/1024), (($3+$5)/$2*100) }')"
     ;;
     Darwin)
       if ! command -v vm_stat 2>&1 > /dev/null; then return 1; fi
