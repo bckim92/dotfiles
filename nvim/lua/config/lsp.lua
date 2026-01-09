@@ -4,6 +4,7 @@
 -- See 'plugins.ide' for the Plug specs
 -- nvim-cmp config has been moved to nvim/lua/config/completion.lua
 
+---@class config.lsp
 local M = {}
 
 -- lsp_signature
@@ -58,10 +59,10 @@ local on_attach = function(client, bufnr)
 
   -- See `:help vim.lsp.*` for documentation on any of the below functions
   if pcall(require, 'fzf-lua') then
-    nbufmap('gr', vim_cmd 'lua require("fzf-lua").lsp_references { jump_to_single_result = true, silent = true }', { nowait = true })
-    nbufmap('gd', vim_cmd 'lua require("fzf-lua").lsp_definitions { jump_to_single_result = true, silent = true }')
-    nbufmap('gi', vim_cmd 'lua require("fzf-lua").lsp_implementations { jump_to_single_result = true, silent = true }')
-    nbufmap('gt', gt_action('lua require("fzf-lua").lsp_typedefs { jump_to_single_result = true, silent = true }'))
+    nbufmap('gr', vim_cmd 'lua require("fzf-lua").lsp_references { jump1 = true, silent = true }', { nowait = true })
+    nbufmap('gd', vim_cmd 'lua require("fzf-lua").lsp_definitions { jump1 = true, silent = true }')
+    nbufmap('gi', vim_cmd 'lua require("fzf-lua").lsp_implementations { jump1 = true, silent = true }')
+    nbufmap('gt', gt_action('lua require("fzf-lua").lsp_typedefs { jump1 = true, silent = true }'))
   else
     nbufmap('gd', vim_cmd 'lua vim.lsp.buf.definition()')
     nbufmap('gr', vim_cmd 'lua vim.lsp.buf.references()', { nowait = true })
@@ -163,29 +164,32 @@ local auto_lsp_servers = {
 }
 
 --- Refresh or force-update mason-registry if needed (e.g. pkgs are missing)
---- and execute the callback asynchronously.
+--- and execute the callback *asynchronously*.
 local function maybe_refresh_mason_registry_and_then(callback, opts)
+  opts = opts or {}
   local mason_registry = require("mason-registry")
-  local function _notify(msg, opts)
+  local function _notify(msg, notify_opts)
     return vim.notify_once(msg, vim.log.levels.INFO,
-      vim.tbl_deep_extend("force", { title = "config/lsp.lua" }, (opts or {})))
+      vim.tbl_deep_extend("force", { title = "config/lsp.lua" }, (notify_opts or {})))
   end
-  local h = nil
-  if vim.tbl_count(mason_registry.get_all_packages()) == 0 then
-    h = _notify("Initializing mason.nvim registry for the first time,\n" ..
-               "please wait a bit until LSP servers start installed.")
+
+  local should_update = false
+  local update_msg = nil
+  if opts.force then
+    should_update, update_msg = true, 'Initializing mason.nvim registry for the first time, please wait a bit until LSP servers are installed.'
+  elseif vim.tbl_count(mason_registry.get_all_package_names()) == 0 then
+    -- TODO: get_all_package_names() still involves blocking file API, avoid duplicate calls
+    should_update, update_msg = true, 'Updating mason.nvim registry ...'
+  end
+
+  if should_update then
+    _notify(update_msg)
     mason_registry.update(function()
       _notify("Updating mason.nvim registry done.")
-      vim.schedule(callback)  -- must detach
-    end)
-  elseif (opts or {}).force then
-    _notify("Updating mason.nvim registry ...")
-    mason_registry.update(function()
-      _notify("Updating mason.nvim registry done.")
-      vim.schedule(callback)  -- must detach
+      vim.schedule(callback)  -- runs asynchronously
     end)
   else
-    callback()  -- don't refresh, for fast startup
+    vim.schedule(callback)
   end
 end
 
@@ -209,12 +213,23 @@ end
 --- Install auto_lsp_servers on demand (FileType)
 function M._ensure_mason_installed()
   local augroup = vim.api.nvim_create_augroup('mason_autoinstall', { clear = true })
-  local lspconfig_to_package = require("mason-lspconfig.mappings.server").lspconfig_to_package
-  local filetype_mappings = require("mason-lspconfig.mappings.filetype")
+
+  -- Hotfix against mason_lspconfig v2.0 breaking changes
+  local lspconfig_to_package = vim.F.npcall(function()
+    return require("mason-lspconfig.mappings.server").lspconfig_to_package
+  end)
+  local filetype_mappings = vim.F.npcall(function()
+    return require("mason-lspconfig.mappings.filetype")
+  end)
+  if lspconfig_to_package == nil then
+    vim.notify("mason-lspconfig is broken in v2.0; please downgrade to v1.32.0 by manual checkout",
+      vim.log.levels.ERROR, { title = "config/lsp" })
+  end
+
   local _requested = {}
 
   local ft_handler = {}
-  for ft, lsp_names in pairs(filetype_mappings) do
+  for ft, lsp_names in pairs(filetype_mappings or {}) do
     lsp_names = vim.tbl_filter(function(lsp_name)
       ---@diagnostic disable-next-line: param-type-mismatch
       return auto_lsp_servers[lsp_name] == true or vim.tbl_contains(auto_lsp_servers[lsp_name] or {}, ft)
@@ -222,7 +237,7 @@ function M._ensure_mason_installed()
 
     ft_handler[ft] = vim.schedule_wrap(function()
       for _, lsp_name in pairs(lsp_names) do
-        local pkg_name = lspconfig_to_package[lsp_name]
+        local pkg_name = (lspconfig_to_package or {})[lsp_name]
         local ok, pkg = pcall(require("mason-registry").get_package, pkg_name)
         if ok and not pkg:is_installed() and not _requested[pkg_name] then
           _requested[pkg_name] = true
@@ -282,41 +297,45 @@ M.lsp_setup_opts = lsp_setup_opts
 local on_init = {}
 M.on_init = on_init
 
----@param setup_name 'python'|'basedpyright' for pyright, use 'python'.
-local pyright_opts = function(setup_name)
+lsp_setup_opts['basedpyright'] = function()
+  -- https://docs.basedpyright.com/latest/configuration/language-server-settings/
+  -- https://github.com/microsoft/pyright/blob/main/docs/settings.md
   return {
-    -- https://github.com/microsoft/pyright/blob/main/docs/settings.md
-    -- https://detachhead.github.io/basedpyright/
     settings = {
-      [setup_name] = {
+      python = {
+        -- Always use the current python in $PATH (the current conda/virtualenv).
+        -- NOTE: python.pythonPath (not basedpyright.pythonPath), see the basedpyright docs
+        pythonPath = vim.fn.exepath("python3"),
+      },
+      basedpyright = {
+        -- in favor of ruff's import organizer
+        disableOrganizeImports = true,
+        -- use auto-import (which is also by default)
+        autoImportCompletions = true,
+
+        -- NOTE: the "discouraged settings" here will be ignored if the project root contains
+        -- either a pyproject.toml ([tool.pyright]) or pyrightconfig.json configuration file.
+        -- https://docs.basedpyright.com/latest/configuration/config-files/#overriding-language-server-settings
+        -- https://docs.basedpyright.com/latest/configuration/language-server-settings/#discouraged-settings
         analysis = {
-          typeCheckingMode = "basic",
+          typeCheckingMode = "standard",
+          -- see https://docs.basedpyright.com/latest/usage/import-resolution/#configuring-your-python-environment
           -- see https://github.com/microsoft/pyright/blob/main/docs/import-resolution.md#resolution-order
           extraPaths = { "./python" },
         },
-        -- Always use the current python in accordance with $PATH (the current conda/virtualenv).
-        pythonPath = vim.fn.exepath("python3"),
+
+        inlayHints = {
+          callArgumentNames = true,
+          callArgumentNamesMathcing = false,
+          functionReturnTypes = true,
+          variableTypes = true,
+          genericTypes = true,  --(override)
+        },
       },
     },
   }
 end
-
-lsp_setup_opts['basedpyright'] = function()
-  -- basedpyright: experimental drop-in replacement of pyright (that supports inlay hints!)
-  -- To use it, simply install it with :Mason. When installed, basedpyright will be enabled
-  -- in place of pyright; otherwise, fallback to the standard pyright.
-  lsp_setup_opts['pyright'] = false
-  return pyright_opts('basedpyright')
-end
-
-lsp_setup_opts['pyright'] = function()
-  -- Do not setup pyright when basedpyright is installed.
-  -- TODO: remove mason dependency.
-  if require('mason-registry').is_installed('basedpyright') then
-    return false
-  end
-  return pyright_opts('python')
-end
+lsp_setup_opts['pyright'] = false  -- disable even if it's installed, in favor of basedpyright
 
 lsp_setup_opts['ruff_lsp'] = false  -- deprecated, should never setup
 lsp_setup_opts['ruff'] = function()
@@ -326,7 +345,7 @@ lsp_setup_opts['ruff'] = function()
     -- Note: use pyproject.toml to configure ruff per project.
     settings = {
       fixAll = true,
-      organizeImports = false,  -- let isort take care of organizeImports
+      organizeImports = false, -- in favor of Conform (:Format ruff_organize_imports)
       -- extra CLI arguments
       -- https://docs.astral.sh/ruff/configuration/#command-line-interface
       -- https://docs.astral.sh/ruff/rules/
@@ -360,7 +379,7 @@ on_init['ruff'] = function(client, _)
   if client.server_capabilities then
     -- Disable ruff hover in favor of Pyright
     client.server_capabilities.hoverProvider = false
-    -- Disable ruff formatting in favor of yapf (null-ls)
+    -- Disable ruff formatting in favor of Conform (ruff_format)
     -- NOTE: ruff-lsp's formatting is a bit buggy, doesn't respect indent_size
     client.server_capabilities.documentFormattingProvider = false
   end
@@ -428,6 +447,23 @@ lsp_setup_opts['clangd'] = {
   capabilities = {
     offsetEncoding = 'utf-8',
   }
+}
+
+lsp_setup_opts['cssls'] = {
+  settings = {
+    css = {
+      validate = true,
+      lint = {
+        unknownAtRules = 'ignore', -- e.g. @apply
+      },
+    },
+    less = {
+      validate = true,
+    },
+    scss = {
+      validate = true,
+    }
+  },
 }
 
 lsp_setup_opts['bashls'] = {
@@ -514,7 +550,9 @@ end)
 
 --- setup all known and available LSP servers that are installed
 function M._setup_lspconfig()
-  local all_known_lsps = require('mason-lspconfig.mappings.server').lspconfig_to_package
+  local all_known_lsps = vim.F.npcall(function()
+    return require('mason-lspconfig.mappings.server').lspconfig_to_package
+  end) or {}
   local lsp_uninstalled = {}   --- { lspconfig name => mason package name }
   local mason_need_refresh = false
 
@@ -681,15 +719,17 @@ function M._setup_diagnostic()
     vim.fn.sign_define("DiagnosticSignHint",   {text = icons[vim.diagnostic.severity.HINT],  texthl = "DiagnosticSignHint"})
   end
   require('utils.rc_utils').RegisterHighlights(function()
-    vim.cmd [[
-      hi DiagnosticSignError    guifg=#e6645f ctermfg=167
-      hi DiagnosticSignWarn     guifg=#b1b14d ctermfg=143
-      hi DiagnosticSignHint     guifg=#3e6e9e ctermfg=75
+    -- Diagnostic signs
+    vim.api.nvim_set_hl(0, "DiagnosticSignError", { fg = "#e6645f", ctermfg = 167 })
+    vim.api.nvim_set_hl(0, "DiagnosticSignWarn", { fg = "#b1b14d", ctermfg = 143 })
+    vim.api.nvim_set_hl(0, "DiagnosticSignHint", { fg = "#3e6e9e", ctermfg = 75 })
 
-      hi DiagnosticVirtualTextError   guifg=#a6242f  gui=italic,underdashed,underline
-      hi DiagnosticVirtualTextWarn    guifg=#777744  gui=italic,underdashed,underline
-      hi DiagnosticVirtualTextHint    guifg=#555555  gui=italic,underdashed,underline
-    ]]
+    -- Diagnostic virtual text
+    local default_virtualtext = { italic = true, underdashed = true, underline = true, }
+    local hl_virt = function(c) return vim.tbl_deep_extend('force', default_virtualtext, c) end
+    vim.api.nvim_set_hl(0, "DiagnosticVirtualTextError", hl_virt { fg = "#a6242f" })
+    vim.api.nvim_set_hl(0, "DiagnosticVirtualTextWarn", hl_virt { fg = "#777744" })
+    vim.api.nvim_set_hl(0, "DiagnosticVirtualTextHint", hl_virt { fg = "#555555" })
   end)
 
   -- Turning on and off diagnostics
@@ -699,10 +739,10 @@ function M._setup_diagnostic()
 
   do
     vim.cmd [[
-      command! DiagnosticsDisableBuffer       :lua vim.diagnostic.disable(0)
-      command! DiagnosticsEnableBuffer        :lua vim.diagnostic.enable(0)
-      command! DiagnosticsDisableAll          :lua vim.diagnostic.disable()
-      command! DiagnosticsEnableAll           :lua vim.diagnostic.enable()
+      command! DiagnosticsDisableBuffer       :lua vim.diagnostic.enable(false, { bufnr = 0 })
+      command! DiagnosticsEnableBuffer        :lua vim.diagnostic.enable(true, { bufnr = 0 })
+      command! DiagnosticsDisableAll          :lua vim.diagnostic.enable(false)
+      command! DiagnosticsEnableAll           :lua vim.diagnostic.enable(true)
       command! DiagnosticsVirtualTextToggle   :lua require('toggle_lsp_diagnostics').toggle_diagnostic('virtual_text')
       command! DiagnosticsUnderlineToggle     :lua require('toggle_lsp_diagnostics').toggle_diagnostic('underline')
     ]]
@@ -870,75 +910,6 @@ function M.setup_trouble()
   }
 end
 
-----------------------------------------
---- Linting, and Code actions
-----------------------------------------
-function M.setup_null_ls()
-  local null_ls = require("null-ls")
-  local h = require("null-ls.helpers")
-
-  -- Monkey-patching because of a performance bug on startup (jose-elias-alvarez/null-ls.nvim#1564)
-  require('null-ls.client').retry_add = require('null-ls.client').try_add
-
-  -- @see https://github.com/jose-elias-alvarez/null-ls.nvim/blob/main/doc/CONFIG.md
-  -- @see https://github.com/jose-elias-alvarez/null-ls.nvim/blob/main/doc/BUILTINS.md
-
-  local executable = function(cmd)
-    return vim.fn.executable(cmd) > 0
-  end
-  local cond_if_executable = function(cmd)
-    return function() return executable(cmd) end
-  end
-  local _exclude_nil = function(tbl)
-    return vim.tbl_filter(function(s) return s ~= nil end, tbl)
-  end
-
-  -- null-ls sources (mason.nvim installation is recommended)
-  -- @see $VIMPLUG/null-ls.nvim/doc/BUILTINS.md
-  -- @see $VIMPLUG/null-ls.nvim/lua/null-ls/builtins/
-  local sources = {}
-  do -- [[ diagnostics (linting) ]]
-    -- python: pylint, flake8
-    vim.list_extend(sources, {
-      require('null-ls.builtins.diagnostics.pylint').with {
-          method = null_ls.methods.DIAGNOSTICS_ON_SAVE,
-          condition = function(utils)  ---@param utils ConditionalUtils
-            -- https://pylint.pycqa.org/en/latest/user_guide/run.html#command-line-options
-            return executable('pylint') and
-              utils.root_has_file({ "pylintrc", ".pylintrc" })
-          end,
-      },
-    })
-  end
-
-  -- See $VIMPLUG/null-ls.nvim/lua/null-ls/config.lua, defaults
-  null_ls.setup({
-    sources = _exclude_nil(sources),
-
-    on_attach = on_attach,
-    should_attach = function(bufnr)
-      -- Excludes some files on which it doesn't not make a sense to use linting.
-      local bufname = vim.api.nvim_buf_get_name(bufnr)
-      if bufname:match("^git://") then return false end
-      if bufname:match("^fugitive://") then return false end
-      if bufname:match("/lib/python%d%.%d+/") then return false end
-      return true
-    end,
-
-    -- Use a border for the :NullLsLog window
-    border = 'single',
-
-    -- Debug mode: Use :NullLsLog for viewing log files (~/.cache/nvim/null-ls.log)
-    debug = false,
-  })
-
-  -- Commands for LSP formatting. :LspFormat
-  -- FormattingOptions: @see https://microsoft.github.io/language-server-protocol/specifications/specification-3-17/#formattingOptions
-  vim.cmd [[
-    command! LspFormatSync        lua vim.lsp.buf.format({timeout_ms = 5000})
-  ]]
-end
-
 
 -- Entrypoint
 function M.setup_lsp()
@@ -958,7 +929,6 @@ function M.setup_all()
   M.setup_navic()
   M.setup_fidget()
   M.setup_trouble()
-  M.setup_null_ls()
 end
 
 

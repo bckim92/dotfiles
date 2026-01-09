@@ -223,8 +223,8 @@ install_node() {
   node --version
 
   # install some useful nodejs based utility (~/.local/lib/node_modules)
-  $HOME/.local/bin/npm install -g yarn
-  _which yarn && yarn --version
+  $HOME/.local/bin/npm install -g pnpm
+  _which pnpm && pnpm --version
   $HOME/.local/bin/npm install -g http-server diff-so-fancy || true;
 }
 
@@ -356,9 +356,15 @@ install_neovim() {
   # install neovim stable or nightly
   # [NEOVIM_VERSION=...] dotfiles install neovim
 
+  local NEOVIM_REPO="neovim/neovim"
+  if ! _version_check $(_glibc_version) 2.34; then
+    NEOVIM_REPO="neovim/neovim-releases"
+    echo -e "${COLOR_YELLOW}Your system's glibc version is too old; using releases from ${NEOVIM_REPO}${COLOR_NONE}"
+  fi
+
   # Otherwise, use the latest stable version.
   local NEOVIM_LATEST_VERSION=$(\
-    curl -fL https://api.github.com/repos/neovim/neovim/releases/latest 2>/dev/null | \
+    curl -fL https://api.github.com/repos/${NEOVIM_REPO}/releases/latest 2>/dev/null | \
     python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])'\
   )   # usually "stable"
   : "${NEOVIM_VERSION:=$NEOVIM_LATEST_VERSION}"
@@ -378,23 +384,29 @@ install_neovim() {
   done
 
   if [ "${NEOVIM_VERSION}" == "nightly" ]; then
-    echo -e "${COLOR_YELLOW}Installing neovim nightly. ${COLOR_NONE}"
+    echo -e "${COLOR_GREEN}Installing neovim nightly. ${COLOR_NONE}"
   else
-    echo -e "${COLOR_YELLOW}Installing neovim stable ${NEOVIM_VERSION}. ${COLOR_NONE}"
-    echo -e "${COLOR_YELLOW}To install a nightly version, add flag: --nightly ${COLOR_NONE}"
+    echo -e "${COLOR_GREEN}Installing neovim stable ${NEOVIM_VERSION}${COLOR_NONE}"
+    echo -e "${COLOR_GREEN}To install a nightly version, use a flag: --nightly ${COLOR_NONE}"
   fi
   sleep 1;  # allow users to read above comments
 
   local TMP_NVIM_DIR="$DOTFILES_TMPDIR/neovim"; mkdir -p $TMP_NVIM_DIR
-  local NVIM_DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/${NEOVIM_VERSION}/nvim.appimage"
+  if _version_check "$NEOVIM_VERSION" "v0.10.4"; then
+    # Assume we use x86_64 linux; I never used arm64 linux machines before.
+    NVIM_APPIMAGE="nvim-linux-x86_64.appimage"
+  else
+    NVIM_APPIMAGE="nvim.appimage"
+  fi
+  local NVIM_DOWNLOAD_URL="https://github.com/${NEOVIM_REPO}/releases/download/${NEOVIM_VERSION}/$NVIM_APPIMAGE"
 
   set -x
   cd $TMP_NVIM_DIR
   wget --backups=1 $NVIM_DOWNLOAD_URL      # always overwrite, having only one backup
 
-  chmod +x nvim.appimage
+  chmod +x "$NVIM_APPIMAGE"
   rm -rf "$TMP_NVIM_DIR/squashfs-root"
-  ./nvim.appimage --appimage-extract >/dev/null   # into ./squashfs-root
+  "./$NVIM_APPIMAGE" --appimage-extract >/dev/null   # into ./squashfs-root
 
   # Install into ~/.local/neovim/ and put a symlink into ~/.local/bin
   local NEOVIM_DEST="$HOME/.local/neovim"
@@ -406,6 +418,7 @@ install_neovim() {
   cp -r squashfs-root/usr "$NEOVIM_DEST"
   rm -f "$PREFIX/bin/nvim"
   ln -sf "$NEOVIM_DEST/bin/nvim" "$PREFIX/bin/nvim"
+  echo -e "${COLOR_GREEN}Installed at $NEOVIM_DEST/ (and linked: $PREFIX/bin/nvim)${COLOR_NONE}"
 
   $PREFIX/bin/nvim --version | head -n3
 }
@@ -418,6 +431,10 @@ install_just() {
   cp -v just.1 "$PREFIX/share/man/man1/"
   _which just
   just --version
+
+  # install zsh completions
+  echo -e "\nWriting zsh completion script at: $PREFIX/share/zsh/site-functions/_just"
+  just --completions zsh > "$PREFIX/share/zsh/site-functions/_just"
 }
 
 install_delta() {

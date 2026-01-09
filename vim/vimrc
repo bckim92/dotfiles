@@ -11,7 +11,7 @@ autocmd! User LazyInit
 if exists("*timer_start") && exists('*nvim_command')  " neovim
   autocmd! VimEnter * call timer_start(0, { -> nvim_command('doautocmd User LazyInit') })
 else  " No timer support, this will run during VimEnter (before UI draws)
-  autocmd! VimEnter * call execute('doautocmd User LazyInit')
+  autocmd! VimEnter * silent! doautocmd User LazyInit
 endif
 
 
@@ -254,7 +254,9 @@ endif
 
 " shut up, vim
 set novisualbell
-set belloff=all
+if exists('+belloff')
+  set belloff=all
+endif
 
 " lazyredraw: no redrawing during macro execution
 " This should NOT be set during startup if < 0.9.1, see neovim/neovim#23534
@@ -382,7 +384,6 @@ nnoremap <leader>:  :
 
 nnoremap <Space> :
 
-inoremap <silent> <C-k>       <Cmd>stopinsert<CR><Cmd>if &buftype == '' <bar> update <bar> endif<CR>
 nnoremap          <leader>e   <Cmd>e<CR>zR
 
 nnoremap Q <Nop>
@@ -799,7 +800,7 @@ nnoremap <silent> <leader>R :call Redraw()<CR>
 
 " <leader>src : source ~/.vimrc
 nnoremap <leader>src   <cmd>call _source_rc()<CR>
-if v:vim_did_enter == 0   " Do not redefine the function
+if exists('v:vim_did_enter') && v:vim_did_enter == 0   " Do not redefine the function
   function! _source_rc() abort
     if has('nvim')
       source ~/.config/nvim/init.lua
@@ -1234,7 +1235,7 @@ if &term =~ '256color'
 endif
 
 " Use 24-bit color.
-if has('termguicolors')
+if has('nvim')
   " Note: We will use GUI colors even if the current session is running under mosh.
   " Although the stable release does not support 24-bit color yet (see GH-961),
   " users are expected to use a HEAD version of mosh both on server and client
@@ -1258,12 +1259,14 @@ endif
 " Helper to register Colorscheme autocmd events (and call once immediately)
 " so that custom highlight overrides can still be applied after changing colorscheme
 function! RegisterHighlights(funcname) abort
-  call funcref(a:funcname)()
+  call function(a:funcname)()
   augroup Colorscheme_RegisterHighlights
     exec "autocmd Colorscheme *  call " . a:funcname . "()"
   augroup END
 endfunction
-augroup Colorscheme_RegisterHighlights | autocmd! | augroup END
+augroup Colorscheme_RegisterHighlights
+  autocmd!
+augroup END
 
 " airline theme: status line and tab line
 if has('termguicolors') && &termguicolors
@@ -1322,10 +1325,10 @@ call RegisterHighlights('HighlightsExtraWhitespace')
 
 augroup trailing_whitespaces
   autocmd!
-  autocmd FileType GV,gitmessengerpopup,gitcommit,fugitive highlight clear ExtraWhitespace
-  autocmd BufWinEnter * if _is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif
-  autocmd InsertEnter * if _is_file_buffer() | match ExtraWhitespace /\s\+\%#\@<!$/ | endif
-  autocmd InsertLeave * if _is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif
+  autocmd FileType GV,gitmessengerpopup,gitcommit,fugitive silent! highlight clear ExtraWhitespace
+  autocmd BufWinEnter * execute "if _is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif"
+  autocmd InsertEnter * execute "if _is_file_buffer() | match ExtraWhitespace /\s\+\%#\@<!$/ | endif"
+  autocmd InsertLeave * execute "if _is_file_buffer() | match ExtraWhitespace /\s\+$/ | endif"
   autocmd BufWinLeave * call clearmatches()
 augroup END
 
@@ -1632,7 +1635,9 @@ call CommandAlias('R', 'AsyncRun')
 
 
 " Alias :Run => :AsyncRun
-call CommandAlias('Run', 'AsyncRun', v:true)
+if has('nvim')
+  call CommandAlias('Run', 'AsyncRun', v:true)
+endif
 
 " legacy asyncrun.vim autocmd events: notification callback when job finishes
 augroup AsyncRunEvents
@@ -1861,10 +1866,10 @@ function! FzfSmart(path) abort
     let l:old_cwd = getcwd()
     execute ':tcd ' . l:git_workdir
     try
-      echon ':GitFiles! (' | echohl Directory | echon getcwd() | echohl NONE | echon ')' | echon '    '
       if l:fzf_lua  " see $DOTVIM/lua/config/fzf.lua
         exec 'GitFiles! ' . l:path
       else  " vanilla vim, using fzf.vim
+        echon ':GitFiles! (' | echohl Directory | echon getcwd() | echohl NONE | echon ')' | echon '    '
         exec 'GFiles --cached --others --modified --exclude-standard --deduplicate ' . l:path
       endif
     finally
@@ -1881,11 +1886,13 @@ endfunction
 
 " :F is a shortcut for :GFiles or :FZF
 command! -complete=dir -nargs=* F        call FzfSmart(<q-args>)
-call CommandAlias('FC', 'F ~/.dotfiles/', v:true)
-call CommandAlias('FP', 'F ~/.dotfiles/vim/plugged/<C-R>=EatWhitespace()<CR>', v:true)
-call CommandAlias('FPlug', 'F ~/.dotfiles/vim/plugged/<C-R>=EatWhitespace()<CR>', v:true)
-call CommandAlias('Fplug', 'F ~/.dotfiles/vim/plugged/<C-R>=EatWhitespace()<CR>', v:false)
-call CommandAlias('Flua', expand("F $VIMRUNTIME/lua"), v:true)
+if has('nvim') || v:version >= 800
+  call CommandAlias('FC', 'F ~/.dotfiles/', v:true)
+  call CommandAlias('FP', 'F ~/.dotfiles/vim/plugged/<C-R>=EatWhitespace()<CR>', v:true)
+  call CommandAlias('FPlug', 'F ~/.dotfiles/vim/plugged/<C-R>=EatWhitespace()<CR>', v:true)
+  call CommandAlias('Fplug', 'F ~/.dotfiles/vim/plugged/<C-R>=EatWhitespace()<CR>', v:false)
+  call CommandAlias('Flua', expand("F $VIMRUNTIME/lua"), v:true)
+endif
 
 " Invoke F (FZF) Using Ctrl-P
 nmap <C-P> <cmd>F<CR>
@@ -2147,6 +2154,9 @@ function! s:setup_wilder() abort
   if !luaeval('require("config.pynvim")()') | return | endif
   if !luaeval('vim.F.npcall(require, "wilder") and true') | return | endif
 
+  " Do not set up wilder.nvim in vscode-neovim (g:vscode)
+  if get(g:, 'vscode', 0) | return | endif
+
   call s:check_wilder_rplugins()
 
   " only / and ? are enabled by default
@@ -2376,10 +2386,12 @@ function! s:init_indent_blankline() abort
   let g:indent_blankline_show_first_indent_level = v:false
 endfunction
 
-function! HighlightsIndentBlankline() abort
-  highlight! IndentBlanklineChar guifg=#444444 gui=nocombine
-endfunction
-call RegisterHighlights('HighlightsIndentBlankline')
+if has('nvim')
+  function! HighlightsIndentBlankline() abort
+    highlight! IndentBlanklineChar guifg=#444444 gui=nocombine
+  endfunction
+  call RegisterHighlights('HighlightsIndentBlankline')
+endif
 
 " ---------------------------------------------------------------- }}}
 " indentLine {{{
@@ -2418,7 +2430,10 @@ let g:scrollview_excluded_filetypes = [
 
 " ---------------------------------------------------------------- }}}
 " UltiSnips {{{
-let g:UltiSnipsExpandTrigger = '<c-j>'
+
+if !has('nvim')  " for nvim, we define imap <c-j> on our own (see config/keymap.lua)
+  let g:UltiSnipsExpandTrigger = '<c-j>'
+end
 let g:UltiSnipsJumpForwardTrigger = '<c-j>'
 let g:UltiSnipsJumpBackwardTrigger = '<c-k>'
 
@@ -2435,9 +2450,11 @@ augroup UltiSnipsAutoReload
   autocmd BufWritePost *.snippets :UltiSnipsRefreshSnippets
 augroup END
 
-call CommandAlias('SnippetEdit', 'UltiSnipsEdit', v:true)
-call CommandAlias('EditSnippets', 'UltiSnipsEdit', v:true)
-call CommandAlias('USE', 'UltiSnipsEdit', v:false)
+if has('nvim')
+  call CommandAlias('SnippetEdit', 'UltiSnipsEdit', v:true)
+  call CommandAlias('EditSnippets', 'UltiSnipsEdit', v:true)
+  call CommandAlias('USE', 'UltiSnipsEdit', v:false)
+endif
 
 " ---------------------------------------------------------------- }}}
 " semshi {{{
@@ -2562,7 +2579,7 @@ let g:tagbar_show_visibility = 0
 " ---------------------------------------------------------------- }}}
 
 " Source all PlugConfig for 'enabled' plugins {{{
-let g:PlugConfig = map(g:PlugConfig, 'funcref(v:val)')
+let g:PlugConfig = map(g:PlugConfig, 'function(v:val)')
 function! s:source_PlugConfig() abort
   " for vim-plug
   for name in keys(g:plugs)

@@ -132,11 +132,14 @@ prepend_path "$GOPATH/bin"
 # rust (cargo)
 prepend_path "$HOME/.cargo/bin"
 
-# Bazel {{{
+# Bazel
 if [ -f "$HOME/.bazel/bin/bazel" ]; then
   export BAZEL_HOME="$HOME/.bazel"
   prepend_path "$BAZEL_HOME/bin"
 fi
+
+# Python (pixi)
+prepend_path "$HOME/.pixi/bin"
 
 # dotfiles-populated bin (having quite high priority)
 prepend_path "$HOME/.dotfiles/bin"
@@ -169,6 +172,8 @@ _try_conda_base "$HOME/.miniforge3" || \
 _try_conda_base "$HOME/miniforge3"  || \
 _try_conda_base "$HOME/.miniconda3" || \
 _try_conda_base "$HOME/miniconda3"  || \
+_try_conda_base "/opt/miniforge3" || \
+_try_conda_base "/opt/miniconda3" || \
 _try_conda_base "/usr/local/miniconda3" || true;
 unfunction _try_conda_base
 

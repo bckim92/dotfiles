@@ -1,10 +1,10 @@
-Dotfiles
-========
+
+# Dotfiles
 
 🏠 Personal dotfiles for \*NIX (macOS and Linux) systems.
 
-Installation
-------------
+
+## Installation
 
 ### 👉 One-liner (if you trust me):
 
@@ -46,8 +46,7 @@ The installation script will clone the repository into `~/.dotfiles` and create 
 If target files already exist (e.g. `~/.vim`, `~/.vimrc`), you will need to manually resolve the conflict (delete the old one or just ignore). See Troubleshooting below for details.
 
 
-`$ dotfiles`
-------------
+## `$ dotfiles`
 
 **To update dotfiles** (pull changes from upstream and run [`install.py`][install.py] again):
 
@@ -64,8 +63,8 @@ $ dotfiles install ripgrep        # -> ~/.local/bin/rg
 ```
 
 
-🆘 Troubleshooting
-------------------
+
+## 🆘 Troubleshooting
 
 *Please read carefully warning messages during installation !!*
 
@@ -91,7 +90,7 @@ $ dotfiles install ripgrep        # -> ~/.local/bin/rg
   this will work in Ubuntu 18.04; install neovim through `dotfiles install neovim` or `NEOVIM_VERSION=0.9.4 dotfiles install neovim`.
 
 * If [**neovim**][neovim] emits any startup errors (e.g. `no module named neovim`):
-    * Use **latest neovim** (e.g., neovim 0.9.5).
+    * Use **latest neovim** (e.g., neovim 0.11.0).
       To install/upgrade neovim on your system, you can run `dotfiles install neovim` (linux) or `brew install neovim` (mac).
     * Try `:checkhealth`.
     * Try `:Lazy update`: some errors from vim plugin could be easily solved by updating plugins to date.
@@ -120,9 +119,8 @@ $ dotfiles install ripgrep        # -> ~/.local/bin/rg
 [install.py]: https://github.com/wookayin/dotfiles/blob/master/install.py
 
 
-License
--------
+## License
 
 [The MIT License (MIT)](LICENSE)
 
-Copyright (c) 2012-2025 Jongwook Choi (@wookayin)
+Copyright (c) 2012-2026 Jongwook Choi (@wookayin)

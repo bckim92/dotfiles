@@ -5,20 +5,29 @@ local Plug = require('utils.plug_utils').Plug
 local PlugConfig = require('utils.plug_utils').PlugConfig
 
 return {
-  -- Folding
-  Plug 'kevinhwang91/nvim-ufo' {
-    enabled = vim.fn.has('nvim-0.9') > 0,
-    dependencies = {'kevinhwang91/promise-async'},
-    event = 'VeryLazy',
-    init = require('config.folding').before_ufo,
-    config = require('config.folding').setup_ufo,
-  };
+  -- Folding (ufo disabled in favor of neovim's built-in treesitter foldtext)
+  -- Plug 'kevinhwang91/nvim-ufo' {
+  --   enabled = vim.fn.has('nvim-0.9') > 0,
+  --   dependencies = {'kevinhwang91/promise-async'},
+  --   event = 'VeryLazy',
+  --   init = require('config.folding').before_ufo,
+  --   config = require('config.folding').setup_ufo,
+  -- };
 
   -- Better Undo
   Plug 'kevinhwang91/nvim-fundo' {
     dependencies = {'kevinhwang91/promise-async'},
     init = function() vim.o.undofile = true; end,
     opts = {},
+  };
+
+  -- Insert mode
+  Plug 'windwp/nvim-autopairs' {
+    version = '*',
+    event = 'InsertEnter',
+    opts = { 
+      ignored_next_char = '[%w]',  -- Don't add pairs if the next char is a 'word' character
+    },
   };
 
   -- Indent Guideline and Scrollbar

@@ -1,4 +1,5 @@
 -- LSP, completions, and language-specific plugins
+---@diagnostic disable: missing-fields
 
 local Plug = require('utils.plug_utils').Plug
 local PlugConfig = require('utils.plug_utils').PlugConfig
@@ -26,20 +27,22 @@ return {
 
   -- LSP (lazy loaded, see config/lsp.lua)
   Plug 'neovim/nvim-lspconfig' {
+    version = 'v2.5.0',
     event = LspSetup,
     dependencies = { 'mason.nvim' },
     config = require('config.lsp').setup_lsp, -- mason, lspconfig, etc.
   };
-  Plug 'williamboman/mason.nvim' {
+  Plug 'mason-org/mason.nvim' {
+    version = 'v1.11.0',  -- TODO v2.0 support
     event = LspSetup, -- as a dependency for nvim-lspconfig
-    dependencies = {
-      Plug 'williamboman/mason-lspconfig.nvim';
-    },
+  };
+  Plug 'mason-org/mason-lspconfig.nvim' {
+    version = 'v1.32.0',  -- TODO v2.0 support
+    event = LspSetup,
   };
   Plug 'folke/neodev.nvim' { event = LspSetup };
   Plug 'ray-x/lsp_signature.nvim' { event = LspSetup };
   Plug 'WhoIsSethDaniel/toggle-lsp-diagnostics.nvim' { lazy = true };
-  Plug 'nvimtools/none-ls.nvim' { event = LspSetup, config = require('config.lsp').setup_null_ls };
   Plug 'nvim-lua/lsp-status.nvim' { event = LspSetup, config = require('config.lsp').setup_lsp_status };
   Plug 'j-hui/fidget.nvim' { branch = 'legacy', event = LspSetup, config = require('config.lsp').setup_fidget };
   Plug 'folke/trouble.nvim' { event = LspSetup, config = require('config.lsp').setup_trouble };
@@ -115,7 +118,7 @@ return {
 
   -- Formatting
   Plug 'stevearc/conform.nvim' {
-    version = '>=5.0',
+    version = 'v9.*',
     config = require('config.formatting').setup,
   };
 
@@ -139,7 +142,9 @@ return {
   -- Python
   Plug 'wookayin/semshi' {
     ft = 'python',
-    cond = has_py3,
+    cond = function()
+      return not vim.g.vscode and has_py3()
+    end,
     config = function()
       -- Semshi uses FileType autocmds on init. Have it called once again when lazy loaded.
       vim.cmd [[ doautocmd SemshiInit FileType python ]]
@@ -151,7 +156,6 @@ return {
   -- Other languages
   Plug 'editorconfig/editorconfig-vim' { cond = not has('nvim') };
   Plug 'sheerun/vim-polyglot' { version = 'v4.2.1' };
-  Plug 'vmchale/just-vim' { ft = 'just' };
   Plug 'tmux-plugins/vim-tmux' { ft = 'tmux' };
   Plug 'fladson/vim-kitty' { ft = 'kitty' };
   Plug 'lervag/vimtex' { init = require('config.tex').init, config = require('config.tex').setup };
@@ -160,7 +164,6 @@ return {
   Plug 'tfnico/vim-gradle' { ft = 'gradle' };
   Plug 'Tyilo/applescript.vim' { ft = 'applescript' };
   Plug 'rdolgushin/groovy.vim' { ft = 'groovy' };
-  Plug 'NoahTheDuke/vim-just' { ft = 'just' };
 
   -- Lua REPL
   Plug 'ii14/neorepl.nvim' { lazy = true };  -- :LuaREPL

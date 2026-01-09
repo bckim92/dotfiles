@@ -3,6 +3,34 @@
 
 local M = {}
 
+-- Experimental: highlight cmdline, messages in a real buffer.
+-- See https://github.com/neovim/neovim/pull/27811 and :help vim._extui
+-- NOTE: Use 'g<' to see more messages!
+function M.setup_extui()
+  if vim.fn.has('nvim-0.12') == 0 then
+    return false
+  end
+
+  vim.schedule(function()
+    require('vim._extui').enable {
+      enable = true,
+      msg = {
+        target = 'cmd', -- for now I'm happy with 'cmd'; 'box' seems buggy
+      },
+    }
+  end)
+
+  -- Customization for 'cmdline', 'msgmore', 'msgbox', 'msgprompt', 'pager' buffers/windows
+  local augroup_extui = vim.api.nvim_create_augroup('extui_custom', { clear = true })
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = 'pager',
+    group = augroup_extui,
+    callback = function(args)
+      vim.keymap.set('n', '<C-c>', '<cmd>close<CR>', { buffer = true, remap = false })
+    end,
+  })
+end
+
 function M.setup_notify()
   vim.cmd [[
     command! -nargs=0 NotificationsPrint   :lua require('notify')._print_history()
@@ -134,6 +162,26 @@ function M.setup_quickui()
       hi! QuickPreview guibg=#262d2d
     ]]
   end)
+end
+
+function M.setup_image()
+  -- setup for image.nvim
+  -- requirements: ImageMagick and kitty-graphics compatible terminal emulator
+  local has_magick = vim.fn.executable('magick') == 1
+  local is_compat_term = vim.iter and vim.iter({ 'tmux', 'kitty', 'ghostty', 'WezTerm' }):find(vim.env.TERM_PROGRAM)
+  if not (has_magick and is_compat_term) then
+    return false
+  end
+
+  -- see $VIMPLUG/image.nvim/lua/image/init.lua for default_options
+  require('image').setup {
+    backend = 'kitty',  -- kitty backend only for now (ghostty, kitty, and wezterm).
+    processor = 'magick_cli',
+    hijack_file_patterns = {
+      "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.pdf",
+      "*.webp", "*.avif",
+    },
+  }
 end
 
 -- Resourcing support

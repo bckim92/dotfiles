@@ -50,6 +50,18 @@ function M.setup_fugitive()
   M._setup_git_commands()
 end
 
+function M.setup_flog()
+  vim.g.flog_enable_dynamic_commit_hl = 1
+  vim.g.flog_default_opts = {
+    order = 'date',  -- same as: git log --date-order ...
+    date = 'short',  -- same as: git log --date=short ... for %ad (author-date)
+
+    -- see ~/.gitconfig: git history
+    format = '%ad %h %d %s %an'
+  }
+end
+
+
 function M.setup_gitmessenger()
   --- https://github.com/rhysd/git-messenger.vim#variables
 
@@ -195,6 +207,7 @@ function M.setup_diffview()
         disable_diagnostics = true,
       },
     },
+    -- :help diffview-config-hooks
     hooks = {
       ---@param ctx { symbol: string, layout_name: string }
       diff_buf_win_enter = function(bufnr, winid, ctx)
@@ -327,6 +340,7 @@ end)()
 -- Resourcing support
 if ... == nil then
   M.setup_fugitive()
+  M.setup_gitmessenger()
   M.setup_diffview()
   M.setup_gitsigns()
 

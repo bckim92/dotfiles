@@ -1,4 +1,5 @@
 -- UI-related plugins.
+---@diagnostic disable: missing-fields
 
 local Plug = require('utils.plug_utils').Plug
 local PlugConfig = require('utils.plug_utils').PlugConfig
@@ -14,6 +15,12 @@ return {
     event = 'VeryLazy',
     init = require('config.ui').init_quickui,
     config = require('config.ui').setup_quickui,
+  };
+
+  -- Image
+  Plug '3rd/image.nvim' {
+    event = 'VeryLazy',  -- TODO support startup arguments
+    config = require('config.ui').setup_image,
   };
 
   -- FZF & Grep
@@ -34,6 +41,7 @@ return {
     cmd = 'FZF', func = 'fzf#*',
   };
   Plug 'ibhagwan/fzf-lua' {
+    version = '>=0.7', -- see fzf-lua:7cede182 (2025.2+)
     event = { 'VeryLazy', 'CmdlineEnter' },
     config = require('config.fzf').setup,
   };
@@ -63,14 +71,7 @@ return {
   -- Explorer
   Plug 'nvim-neo-tree/neo-tree.nvim' {
     branch = 'main',
-    version = '>=3.12',
-    event = (function()
-      -- If any of the startup argument is a directory (e.g., "nvim ./"),
-      -- we don't lazy-load neotree so it can hijack netrw.
-      if vim.tbl_contains(vim.tbl_map(vim.fn.isdirectory, vim.fn.argv()), 1) then return 'VimEnter'
-      else return 'VeryLazy' end
-    end)(),
-    cmd = { 'Neotree' },  -- support "nvim -c Neotree"
+    version = '>=3.34',
     init = function() vim.g.neo_tree_remove_legacy_commands = 1; end,
     config = require('config.neotree').setup_neotree,
   };
