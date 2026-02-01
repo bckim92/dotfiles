@@ -12,6 +12,25 @@ mkdir -p $PREFIX/share/zsh/site-functions
 
 DOTFILES_TMPDIR="/tmp/$USER/linux-locals"
 
+# Detect architecture
+MACHINE_ARCH=$(uname -m)
+case "$MACHINE_ARCH" in
+  x86_64)
+    ARCH_X86="x86_64"
+    ARCH_AARCH="x86_64"   # some tools use x86_64 for both naming conventions
+    ARCH_AMD="amd64"
+    ;;
+  aarch64|arm64)
+    ARCH_X86="aarch64"    # Linux ARM uses aarch64
+    ARCH_AARCH="aarch64"
+    ARCH_AMD="arm64"
+    ;;
+  *)
+    echo "Unsupported architecture: $MACHINE_ARCH"
+    exit 1
+    ;;
+esac
+
 COLOR_NONE="\033[0m"
 COLOR_RED="\033[0;31m"
 COLOR_GREEN="\033[0;32m"
@@ -295,13 +314,13 @@ install_miniforge() {
 install_miniconda() {
   # installs Miniconda3. (Deprecated: Use miniforge3)
   # https://conda.io/miniconda.html
-  local MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+  local MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH_AARCH}.sh"
 
   local TMP_DIR="$DOTFILES_TMPDIR/miniconda/"; mkdir -p $TMP_DIR && cd ${TMP_DIR}
   wget -nc $MINICONDA_URL
 
   local MINICONDA_PREFIX="$HOME/.miniconda3/"
-  bash "Miniconda3-latest-Linux-x86_64.sh" -b -p ${MINICONDA_PREFIX}
+  bash "Miniconda3-latest-Linux-${ARCH_AARCH}.sh" -b -p ${MINICONDA_PREFIX}
 
   # 3.9.5 as of Nov 2021
   $MINICONDA_PREFIX/bin/python3 --version
@@ -393,8 +412,8 @@ install_neovim() {
 
   local TMP_NVIM_DIR="$DOTFILES_TMPDIR/neovim"; mkdir -p $TMP_NVIM_DIR
   if _version_check "$NEOVIM_VERSION" "v0.10.4"; then
-    # Assume we use x86_64 linux; I never used arm64 linux machines before.
-    NVIM_APPIMAGE="nvim-linux-x86_64.appimage"
+    # neovim uses arm64 (not aarch64) for ARM builds
+    NVIM_APPIMAGE="nvim-linux-${ARCH_AMD}.appimage"
   else
     NVIM_APPIMAGE="nvim.appimage"
   fi
@@ -449,7 +468,7 @@ install_delta() {
 
 install_eza() {
   # https://github.com/eza-community/eza/releases
-  _template_github_latest "eza" "eza-community/eza" 'eza_x86_64-*linux-gnu*'
+  _template_github_latest "eza" "eza-community/eza" "eza_${ARCH_AARCH}-*linux-gnu*"
 
   cp -v "./eza" "$PREFIX/bin/eza"
   curl -fL "https://raw.githubusercontent.com/eza-community/eza/main/completions/zsh/_eza" > \
@@ -460,7 +479,7 @@ install_eza() {
 
 install_fd() {
   # https://github.com/sharkdp/fd/releases
-  _template_github_latest "fd" "sharkdp/fd" "fd-*-x86_64-unknown-linux-musl.tar.gz"
+  _template_github_latest "fd" "sharkdp/fd" "fd-*-${ARCH_AARCH}-unknown-linux-musl.tar.gz"
   cp -v "./fd" $PREFIX/bin
   cp -v "./autocomplete/_fd" $PREFIX/share/zsh/site-functions
 
@@ -470,7 +489,12 @@ install_fd() {
 
 install_ripgrep() {
   # https://github.com/BurntSushi/ripgrep/releases
-  _template_github_latest "ripgrep" "BurntSushi/ripgrep" "ripgrep-*-x86_64-unknown-linux-musl.tar.gz"
+  # Note: x86_64 uses musl, aarch64 uses gnu (no musl build available for ARM)
+  if [[ "$MACHINE_ARCH" == "x86_64" ]]; then
+    _template_github_latest "ripgrep" "BurntSushi/ripgrep" "ripgrep-*-x86_64-unknown-linux-musl.tar.gz"
+  else
+    _template_github_latest "ripgrep" "BurntSushi/ripgrep" "ripgrep-*-aarch64-unknown-linux-gnu.tar.gz"
+  fi
   cp -v "./rg" $PREFIX/bin/
   cp -v "./complete/_rg" $PREFIX/share/zsh/site-functions
 
@@ -489,7 +513,7 @@ install_xsv() {
 
 install_bat() {
   # https://github.com/sharkdp/bat/releases
-  _template_github_latest "bat" "sharkdp/bat" "bat-*-x86_64-unknown-linux-musl.tar.gz"
+  _template_github_latest "bat" "sharkdp/bat" "bat-*-${ARCH_AARCH}-unknown-linux-musl.tar.gz"
   cp -v "./bat" $PREFIX/bin/
   cp -v "./autocomplete/bat.zsh" $PREFIX/share/zsh/site-functions/_bat
 
